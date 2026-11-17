@@ -58,6 +58,7 @@ struct OpenQuickTranslateIntent: AppIntent {
 
 struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        [
         AppShortcut(
             intent: ExtractTextFromScreenshotIntent(),
             phrases: ["Extract text with \u{0024}{applicationName}"],
