@@ -11,7 +11,9 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
 
     @Parameter(
         title: "Screenshot",
-        description: "Connect this to the image output of the Take Screenshot or Find Photos action."
+        description: "Connect this to the image output of the Take Screenshot or Find Photos action.",
+        supportedContentTypes: [.image],
+        inputConnectionBehavior: .connectToPreviousIntentResult
     )
     var screenshot: IntentFile
 
