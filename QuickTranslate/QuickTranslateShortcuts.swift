@@ -13,7 +13,7 @@ struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: OpenQuickTranslateIntent(),
-            phrases: ["Open QuickTranslate"],
+            phrases: ["Open ${applicationName}"],
             shortTitle: "QuickTranslate",
             systemImageName: "translate"
         )
