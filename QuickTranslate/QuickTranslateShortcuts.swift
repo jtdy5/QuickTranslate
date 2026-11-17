@@ -1,24 +1,24 @@
 import AppIntents
+import Photos
 import Vision
 
-/// Extracts readable text from an image shared to the QuickTranslate shortcut.
-/// The returned text can be passed to Apple's Translate Text and Quick Look actions.
+/// Finds the newest screenshot in Photos and extracts its readable text.
+/// No file parameter is exposed, so Shortcuts won't show a file picker.
 struct ExtractTextFromScreenshotIntent: AppIntent {
-    static var title: LocalizedStringResource = "Extract Text from Screenshot"
+    static var title: LocalizedStringResource = "Translate Latest Screenshot"
     static var description = IntentDescription(
-        "Recognizes text in a shared screenshot or image so it can be translated and previewed."
+        "Finds your most recent screenshot in Photos, recognizes its text, and makes it available to the Translate and Quick Look actions."
     )
     static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Screenshot")
-    var screenshot: IntentFile
-
     func perform() async throws -> some ReturnsValue<String> {
+        let imageData = try await latestScreenshotData()
+
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
 
-        let handler = VNImageRequestHandler(data: screenshot.data)
+        let handler = VNImageRequestHandler(data: imageData)
         try handler.perform([request])
 
         let observations = request.results ?? []
@@ -36,11 +36,62 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
             throw NSError(
                 domain: "QuickTranslate",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "No readable text was found in that image."]
+                userInfo: [NSLocalizedDescriptionKey: "No readable text was found in your latest screenshot."]
             )
         }
 
         return .result(value: recognizedText)
+    }
+
+    private func latestScreenshotData() async throws -> Data {
+        let authorization = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        guard authorization == .authorized || authorization == .limited else {
+            throw NSError(
+                domain: "QuickTranslate",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Allow QuickTranslate access to Photos so it can find your latest screenshot."]
+            )
+        }
+
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.predicate = NSPredicate(
+            format: "(mediaSubtypes & %d) != 0",
+            PHAssetMediaSubtype.photoScreenshot.rawValue
+        )
+        options.fetchLimit = 1
+
+        guard let asset = PHAsset.fetchAssets(with: .image, options: options).firstObject else {
+            throw NSError(
+                domain: "QuickTranslate",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "No screenshot was found in your Photos library."]
+            )
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let requestOptions = PHImageRequestOptions()
+            requestOptions.isSynchronous = false
+            requestOptions.version = .current
+            requestOptions.deliveryMode = .highQualityFormat
+
+            PHImageManager.default().requestImageDataAndOrientation(
+                for: asset,
+                options: requestOptions
+            ) { data, _, _, error in
+                if let data {
+                    continuation.resume(returning: data)
+                } else {
+                    continuation.resume(
+                        throwing: error ?? NSError(
+                            domain: "QuickTranslate",
+                            code: 4,
+                            userInfo: [NSLocalizedDescriptionKey: "Could not load your latest screenshot."]
+                        )
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -58,13 +109,13 @@ struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: ExtractTextFromScreenshotIntent(),
-            phrases: ["Extract text with \(.applicationName)"],
+            phrases: ["Translate my latest screenshot with \\(.applicationName)"],
             shortTitle: "Translate Screenshot",
             systemImageName: "text.viewfinder"
         )
         AppShortcut(
             intent: OpenQuickTranslateIntent(),
-            phrases: ["Open \(.applicationName)"],
+            phrases: ["Open \\(.applicationName)"],
             shortTitle: "Open QuickTranslate",
             systemImageName: "translate"
         )
