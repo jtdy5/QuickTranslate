@@ -1,6 +1,5 @@
 import AppIntents
 import Vision
-import ImageIO
 
 /// Extracts readable text from an image shared to the QuickTranslate shortcut.
 /// The returned text can be passed to Apple's Translate Text and Quick Look actions.
@@ -15,16 +14,15 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     func perform() async throws -> some ReturnsValue<String> {
-        let data = screenshot.data
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
 
-        let handler = VNImageRequestHandler(data: data)
+        let handler = VNImageRequestHandler(data: screenshot.data)
         try handler.perform([request])
 
         let observations = request.results ?? []
-        let text = observations
+        let recognizedText = observations
             .sorted {
                 if abs($0.boundingBox.midY - $1.boundingBox.midY) > 0.012 {
                     return $0.boundingBox.midY > $1.boundingBox.midY
@@ -34,7 +32,7 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
             .compactMap { $0.topCandidates(1).first?.string }
             .joined(separator: "\n")
 
-        guard !text.isEmpty else {
+        guard !recognizedText.isEmpty else {
             throw NSError(
                 domain: "QuickTranslate",
                 code: 1,
@@ -42,7 +40,7 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
             )
         }
 
-        return .result(value: text)
+        return .result(value: recognizedText)
     }
 }
 
@@ -58,19 +56,17 @@ struct OpenQuickTranslateIntent: AppIntent {
 
 struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
-        [
         AppShortcut(
             intent: ExtractTextFromScreenshotIntent(),
-            phrases: ["Extract text with \u{0024}{applicationName}"],
+            phrases: ["Extract text with \\(.applicationName)"],
             shortTitle: "Translate Screenshot",
             systemImageName: "text.viewfinder"
-        ),
+        )
         AppShortcut(
             intent: OpenQuickTranslateIntent(),
-            phrases: ["Open \u{0024}{applicationName}"],
+            phrases: ["Open \\(.applicationName)"],
             shortTitle: "Open QuickTranslate",
             systemImageName: "translate"
         )
-    ]
     }
 }
