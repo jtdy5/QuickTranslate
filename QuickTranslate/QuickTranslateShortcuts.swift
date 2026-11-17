@@ -69,7 +69,7 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
             )
         }
 
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+        let imageData: Data = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, any Error>) -> Void in
             let requestOptions = PHImageRequestOptions()
             requestOptions.isSynchronous = false
             requestOptions.version = .current
@@ -78,7 +78,8 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
             PHImageManager.default().requestImageDataAndOrientation(
                 for: asset,
                 options: requestOptions
-            ) { data, _, _, error in
+            ) { (data: Data?, dataUTI: String?, orientation: CGImagePropertyOrientation, info: [AnyHashable: Any]?) in
+                let error = info?[PHImageErrorKey] as? Error
                 if let data {
                     continuation.resume(returning: data)
                 } else {
@@ -92,6 +93,7 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
                 }
             }
         }
+        return imageData
     }
 }
 
