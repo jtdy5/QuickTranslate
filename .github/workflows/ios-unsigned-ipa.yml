@@ -1,0 +1,48 @@
+name: iOS Unsigned IPA Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for physical iPhone (unsigned)
+        run: |
+          xcodebuild \
+            -project QuickTranslate.xcodeproj \
+            -scheme QuickTranslate \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/QuickTranslate.app"
+          test -d "$APP_PATH"
+          mkdir -p ipa/Payload
+          cp -R "$APP_PATH" ipa/Payload/QuickTranslate.app
+          cd ipa
+          /usr/bin/zip -r -y ../QuickTranslate-unsigned.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuickTranslate-unsigned-IPA
+          path: QuickTranslate-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
