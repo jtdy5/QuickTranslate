@@ -70,5 +70,6 @@ struct QuickTranslateShortcuts: AppShortcutsProvider {
             shortTitle: "Open QuickTranslate",
             systemImageName: "translate"
         )
+    ]
     }
 }
