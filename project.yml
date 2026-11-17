@@ -1,0 +1,29 @@
+name: QuickTranslate
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_CFBundleDisplayName: QuickTranslate
+    INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+targets:
+  QuickTranslate:
+    type: application
+    platform: iOS
+    sources:
+      - path: QuickTranslate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.QuickTranslate
+        PRODUCT_NAME: QuickTranslate
+        SWIFT_EMIT_LOC_STRINGS: YES
+        CODE_SIGN_STYLE: Automatic
+    scheme:
+      testTargets: []
+      gatherCoverageData: false
