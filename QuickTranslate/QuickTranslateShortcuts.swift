@@ -63,7 +63,7 @@ struct QuickTranslateShortcuts: AppShortcutsProvider {
             phrases: ["Extract text with \u{0024}{applicationName}"],
             shortTitle: "Translate Screenshot",
             systemImageName: "text.viewfinder"
-        )
+        ),
         AppShortcut(
             intent: OpenQuickTranslateIntent(),
             phrases: ["Open \u{0024}{applicationName}"],
