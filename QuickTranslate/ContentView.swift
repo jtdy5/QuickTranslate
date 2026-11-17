@@ -3,6 +3,7 @@ import UIKit
 import PhotosUI
 import Vision
 import Translation
+import ImageIO
 
 struct RecognizedLine: Identifiable {
     let id = UUID()
@@ -59,13 +60,15 @@ struct ContentView: View {
                                     height: line.box.height * size.height
                                 )
                                 Text(translations[line.id] ?? line.text)
-                                    .font(.system(size: max(10, rect.height * 0.55), weight: .medium))
+                                    .font(.system(size: max(8, rect.height * 0.52), weight: .medium))
                                     .lineLimit(3)
-                                    .minimumScaleFactor(0.55)
-                                    .padding(2)
-                                    .frame(width: max(30, rect.width), height: max(18, rect.height), alignment: .leading)
+                                    .minimumScaleFactor(0.35)
+                                    .multilineTextAlignment(.leading)
+                                    .padding(1)
+                                    .frame(width: max(1, rect.width), height: max(1, rect.height), alignment: .leading)
                                     .background(.white.opacity(0.96))
                                     .foregroundStyle(.black)
+                                    .clipped()
                                     .position(x: rect.midX, y: rect.midY)
                             }
                         }
@@ -130,6 +133,20 @@ struct ContentView: View {
         recognizeText(in: uiImage)
     }
 
+    private func cgImageOrientation(for orientation: UIImage.Orientation) -> CGImagePropertyOrientation {
+        switch orientation {
+        case .up: return .up
+        case .down: return .down
+        case .left: return .left
+        case .right: return .right
+        case .upMirrored: return .upMirrored
+        case .downMirrored: return .downMirrored
+        case .leftMirrored: return .leftMirrored
+        case .rightMirrored: return .rightMirrored
+        @unknown default: return .up
+        }
+    }
+
     private func recognizeText(in image: UIImage) {
         guard let cgImage = image.cgImage else {
             status = "This image could not be processed."
@@ -151,7 +168,8 @@ struct ContentView: View {
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
         DispatchQueue.global(qos: .userInitiated).async {
-            try? VNImageRequestHandler(cgImage: cgImage).perform([request])
+            let handler = VNImageRequestHandler(cgImage: cgImage, orientation: cgImageOrientation(for: image.imageOrientation))
+            try? handler.perform([request])
         }
     }
 }
