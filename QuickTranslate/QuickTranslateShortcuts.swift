@@ -69,7 +69,7 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
             )
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             let requestOptions = PHImageRequestOptions()
             requestOptions.isSynchronous = false
             requestOptions.version = .current
