@@ -4,6 +4,7 @@ import PhotosUI
 import Vision
 import Translation
 import ImageIO
+import NaturalLanguage
 
 struct RecognizedLine: Identifiable {
     let id = UUID()
@@ -98,10 +99,7 @@ struct ContentView: View {
                 Button("Translate detected text") {
                     translations.removeAll()
                     translatedImage = nil
-                    configuration = TranslationSession.Configuration(
-                        source: nil,
-                        target: Locale.Language(identifier: targetLanguage)
-                    )
+                    configuration = detectedTranslationConfiguration()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(lines.isEmpty || autoTranslateAfterOCR)
@@ -109,6 +107,9 @@ struct ContentView: View {
             .padding()
             .navigationTitle("QuickTranslate")
             .onAppear {
+                processPendingShortcutScreenshot()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("QuickTranslateProcessPendingScreenshot"))) { _ in
                 processPendingShortcutScreenshot()
             }
             .onChange(of: selectedPhoto) { _, item in
@@ -226,10 +227,7 @@ struct ContentView: View {
                     autoTranslateAfterOCR = false
                     status = "No readable text was found. Try cropping away the app interface."
                 } else if autoTranslateAfterOCR {
-                    configuration = TranslationSession.Configuration(
-                        source: nil,
-                        target: Locale.Language(identifier: targetLanguage)
-                    )
+                    configuration = detectedTranslationConfiguration()
                 }
             }
         }
@@ -248,6 +246,19 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+
+    private func detectedTranslationConfiguration() -> TranslationSession.Configuration {
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(lines.map(\\.text).joined(separator: " "))
+        let source = recognizer.dominantLanguage.map {
+            Locale.Language(identifier: $0.rawValue)
+        }
+        return TranslationSession.Configuration(
+            source: source,
+            target: Locale.Language(identifier: targetLanguage)
+        )
     }
 
     private func renderTranslatedImage() -> UIImage? {
