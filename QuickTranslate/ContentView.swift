@@ -114,6 +114,7 @@ struct ContentView: View {
             }
             .padding()
             .navigationTitle("QuickTranslate")
+            .onAppear { processPendingScreenshot() }
             .onChange(of: selectedPhoto) { _, item in
                 Task { await loadPhoto(item) }
             }
@@ -147,6 +148,19 @@ struct ContentView: View {
             }
         }
         .quickLookPreview($quickLookURL)
+    }
+
+    @MainActor
+    private func processPendingScreenshot() {
+        guard let data = PendingScreenshotStore.take(),
+              let uiImage = UIImage(data: data) else { return }
+        image = uiImage
+        lines = []
+        translations = [:]
+        translatedImage = nil
+        autoTranslateAfterOCR = true
+        status = "Reading screenshot and translating…"
+        recognizeText(in: uiImage)
     }
 
     private func fittedSize(_ imageSize: CGSize, in bounds: CGSize) -> CGSize {
