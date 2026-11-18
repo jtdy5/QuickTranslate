@@ -2,19 +2,8 @@ import AppIntents
 import Vision
 import UIKit
 import UniformTypeIdentifiers
-
-private let quickTranslateSeparator = " ⟦QTSEG⟧ "
-private let quickTranslateScreenshotFilename = "QuickTranslate-original-screenshot"
-
-private func cachedScreenshotURL() throws -> URL {
-    let directory = try FileManager.default.url(
-        for: .cachesDirectory,
-        in: .userDomainMask,
-        appropriateFor: nil,
-        create: true
-    )
-    return directory.appendingPathComponent(quickTranslateScreenshotFilename)
-}
+import Translation
+import NaturalLanguage
 
 private func recognizedObservations(in data: Data) throws -> [VNRecognizedTextObservation] {
     let request = VNRecognizeTextRequest()
@@ -26,8 +15,6 @@ private func recognizedObservations(in data: Data) throws -> [VNRecognizedTextOb
     let handler = VNImageRequestHandler(data: data)
     try handler.perform([request])
 
-    // Ignore low-confidence noise, tiny interface labels, status-bar text,
-    // and OCR fragments that contain no meaningful letters.
     let filtered = (request.results ?? []).filter { observation in
         guard observation.confidence >= 0.35 else { return false }
         let box = observation.boundingBox
@@ -47,136 +34,138 @@ private func recognizedObservations(in data: Data) throws -> [VNRecognizedTextOb
     }
 }
 
-/// Extracts individual OCR regions, separated by a marker so Shortcuts can translate them together.
-struct ExtractTextFromScreenshotIntent: AppIntent {
-    static var title: LocalizedStringResource = "Translate Latest Screenshot"
+private func makeTranslatedImage(
+    original: UIImage,
+    observations: [VNRecognizedTextObservation],
+    translations: [String]
+) throws -> IntentFile {
+    guard observations.count == translations.count else {
+        throw NSError(domain: "QuickTranslate", code: 3,
+                      userInfo: [NSLocalizedDescriptionKey: "The number of translated lines did not match the detected text. Please try the screenshot again."])
+    }
+
+    let renderer = UIGraphicsImageRenderer(size: original.size)
+    let rendered = renderer.image { _ in
+        original.draw(in: CGRect(origin: .zero, size: original.size))
+
+        for (observation, translation) in zip(observations, translations) {
+            let box = observation.boundingBox
+            let rect = CGRect(
+                x: box.minX * original.size.width,
+                y: (1 - box.maxY) * original.size.height,
+                width: box.width * original.size.width,
+                height: box.height * original.size.height
+            ).insetBy(dx: -3, dy: -2)
+
+            let safeRect = rect.intersection(CGRect(origin: .zero, size: original.size))
+            guard !safeRect.isNull, !safeRect.isEmpty else { continue }
+
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            paragraph.lineBreakMode = .byWordWrapping
+
+            let text = translation.trimmingCharacters(in: .whitespacesAndNewlines)
+            let available = safeRect.insetBy(dx: 2, dy: 1)
+            let baseFontSize = max(7, safeRect.height * 0.72)
+            var attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: baseFontSize, weight: .medium),
+                .foregroundColor: UIColor.black,
+                .paragraphStyle: paragraph
+            ]
+
+            for size in stride(from: baseFontSize, through: 6, by: -1) {
+                attributes[.font] = UIFont.systemFont(ofSize: size, weight: .medium)
+                let measured = (text as NSString).boundingRect(
+                    with: CGSize(width: max(1, available.width), height: .greatestFiniteMagnitude),
+                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                    attributes: attributes,
+                    context: nil
+                )
+                if measured.height <= available.height { break }
+            }
+
+            UIColor.white.withAlphaComponent(0.97).setFill()
+            UIBezierPath(roundedRect: safeRect, cornerRadius: 2).fill()
+            (text as NSString).draw(in: available, withAttributes: attributes)
+        }
+    }
+
+    guard let png = rendered.pngData() else {
+        throw NSError(domain: "QuickTranslate", code: 5,
+                      userInfo: [NSLocalizedDescriptionKey: "Could not create the translated image."])
+    }
+
+    return IntentFile(data: png, filename: "QuickTranslate-Translated.png", type: .png)
+}
+
+/// Performs OCR, language detection, translation, and image rendering in one Shortcut action.
+struct TranslateScreenshotIntent: AppIntent {
+    static var title: LocalizedStringResource = "Translate Screenshot"
     static var description = IntentDescription(
-        "Recognizes text regions in a screenshot so Shortcuts can translate them."
+        "Automatically detects and translates text in a screenshot, then returns the finished translated image."
     )
     static var openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Screenshot",
-        description: "The screenshot to recognize.",
-        supportedContentTypes: [.image],
-        inputConnectionBehavior: .connectToPreviousIntentResult
+        description: "The screenshot to translate.",
+        supportedContentTypes: [.image]
     )
     var screenshot: IntentFile
 
-    func perform() async throws -> some ReturnsValue<String> {
-        let screenshotURL = try cachedScreenshotURL()
-        try screenshot.data.write(to: screenshotURL, options: .atomic)
-
-        let observations = try recognizedObservations(in: screenshot.data)
-        let blocks = observations.compactMap { $0.topCandidates(1).first?.string }
-            .map { $0.replacingOccurrences(of: "\n", with: " ") }
-
-        guard !blocks.isEmpty else {
-            throw NSError(domain: "QuickTranslate", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "No readable text was found in the supplied screenshot."])
-        }
-
-        return .result(value: blocks.joined(separator: quickTranslateSeparator))
-    }
-}
-
-/// Re-runs the same OCR and places each translated block over its original region.
-struct RenderTranslatedScreenshotIntent: AppIntent {
-    static var title: LocalizedStringResource = "Create Translated Screenshot"
-    static var description = IntentDescription(
-        "Places translated text over the detected text regions and returns a translated image for Quick Look."
-    )
-    static var openAppWhenRun: Bool = false
-
-    @Parameter(
-        title: "Translated Text",
-        description: "Connect this to the output of the Translate Text action.",
-        inputConnectionBehavior: .connectToPreviousIntentResult
-    )
-    var translatedText: String
+    @Parameter(title: "Translate to", default: "en")
+    var targetLanguage: String
 
     func perform() async throws -> some ReturnsValue<IntentFile> {
-        let screenshotURL = try cachedScreenshotURL()
-        guard FileManager.default.fileExists(atPath: screenshotURL.path) else {
-            throw NSError(domain: "QuickTranslate", code: 6,
-                          userInfo: [NSLocalizedDescriptionKey: "No original screenshot is cached. Run Translate Latest Screenshot first, using the screenshot you want to translate."])
-        }
-        let screenshotData = try Data(contentsOf: screenshotURL)
-        let observations = try recognizedObservations(in: screenshotData)
-        let translatedBlocks = translatedText.components(separatedBy: quickTranslateSeparator)
+        let data = screenshot.data
+        let observations = try recognizedObservations(in: data)
 
         guard !observations.isEmpty else {
+            throw NSError(domain: "QuickTranslate", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "No readable text was found. Try a clearer screenshot or crop away the app interface."])
+        }
+
+        let sourceLines = observations.compactMap { $0.topCandidates(1).first?.string }
+        guard sourceLines.count == observations.count else {
             throw NSError(domain: "QuickTranslate", code: 2,
-                          userInfo: [NSLocalizedDescriptionKey: "No text regions could be found in the original screenshot."])
+                          userInfo: [NSLocalizedDescriptionKey: "Some detected text could not be read."])
         }
 
-        guard translatedBlocks.count == observations.count else {
-            throw NSError(domain: "QuickTranslate", code: 3,
-                          userInfo: [NSLocalizedDescriptionKey: "The translation changed the text separators. Try translating without changing the ⟦QTSEG⟧ markers."])
+        let languageSample = sourceLines.joined(separator: " ")
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(languageSample)
+        guard let detectedLanguage = recognizer.dominantLanguage else {
+            throw NSError(domain: "QuickTranslate", code: 7,
+                          userInfo: [NSLocalizedDescriptionKey: "QuickTranslate could not identify the language. Try a screenshot containing more readable dialogue."])
         }
 
-        guard let original = UIImage(data: screenshotData) else {
+        guard let original = UIImage(data: data) else {
             throw NSError(domain: "QuickTranslate", code: 4,
                           userInfo: [NSLocalizedDescriptionKey: "The supplied screenshot could not be opened as an image."])
         }
 
-        let renderer = UIGraphicsImageRenderer(size: original.size)
-        let rendered = renderer.image { context in
-            original.draw(in: CGRect(origin: .zero, size: original.size))
-
-            for (observation, translation) in zip(observations, translatedBlocks) {
-                let box = observation.boundingBox
-                let rect = CGRect(
-                    x: box.minX * original.size.width,
-                    y: (1 - box.maxY) * original.size.height,
-                    width: box.width * original.size.width,
-                    height: box.height * original.size.height
-                ).insetBy(dx: -3, dy: -2)
-
-                let safeRect = rect.intersection(CGRect(origin: .zero, size: original.size))
-                guard !safeRect.isNull, !safeRect.isEmpty else { continue }
-
-                let paragraph = NSMutableParagraphStyle()
-                paragraph.alignment = .center
-                paragraph.lineBreakMode = .byWordWrapping
-
-                let baseFontSize = max(7, safeRect.height * 0.72)
-                var chosenFont = UIFont.systemFont(ofSize: baseFontSize, weight: .medium)
-                let text = translation.trimmingCharacters(in: .whitespacesAndNewlines)
-                var attributes: [NSAttributedString.Key: Any] = [
-                    .font: chosenFont,
-                    .foregroundColor: UIColor.black,
-                    .paragraphStyle: paragraph
-                ]
-
-                let available = safeRect.insetBy(dx: 2, dy: 1)
-                for size in stride(from: baseFontSize, through: 6, by: -1) {
-                    chosenFont = UIFont.systemFont(ofSize: size, weight: .medium)
-                    attributes[.font] = chosenFont
-                    let measured = (text as NSString).boundingRect(
-                        with: CGSize(width: max(1, available.width), height: .greatestFiniteMagnitude),
-                        options: [.usesLineFragmentOrigin, .usesFontLeading],
-                        attributes: attributes,
-                        context: nil
-                    )
-                    if measured.height <= available.height { break }
-                }
-
-                UIColor.white.withAlphaComponent(0.97).setFill()
-                UIBezierPath(roundedRect: safeRect, cornerRadius: 2).fill()
-                (text as NSString).draw(
-                    in: available,
-                    withAttributes: attributes
-                )
-            }
+        guard #available(iOS 26.0, *) else {
+            throw NSError(domain: "QuickTranslate", code: 8,
+                          userInfo: [NSLocalizedDescriptionKey: "Automatic Shortcut translation requires iOS 26 or later. You can still translate images from inside the QuickTranslate app."])
         }
 
-        guard let png = rendered.pngData() else {
-            throw NSError(domain: "QuickTranslate", code: 5,
-                          userInfo: [NSLocalizedDescriptionKey: "Could not create the translated image."])
+        let source = Locale.Language(identifier: detectedLanguage.rawValue)
+        let target = Locale.Language(identifier: targetLanguage)
+        let session = TranslationSession(installedSource: source, target: target)
+
+        var translatedLines: [String] = []
+        translatedLines.reserveCapacity(sourceLines.count)
+        for line in sourceLines {
+            let response = try await session.translate(line)
+            translatedLines.append(response.targetText)
         }
 
-        return .result(value: IntentFile(data: png, filename: "QuickTranslate-Translated.png", type: .png))
+        let file = try makeTranslatedImage(
+            original: original,
+            observations: observations,
+            translations: translatedLines
+        )
+        return .result(value: file)
     }
 }
 
@@ -193,7 +182,7 @@ struct OpenQuickTranslateIntent: AppIntent {
 struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: ExtractTextFromScreenshotIntent(),
+            intent: TranslateScreenshotIntent(),
             phrases: ["Translate my latest screenshot with \(.applicationName)"],
             shortTitle: "Translate Screenshot",
             systemImageName: "text.viewfinder"
