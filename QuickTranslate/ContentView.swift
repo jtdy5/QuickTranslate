@@ -14,6 +14,7 @@ struct RecognizedLine: Identifiable {
 }
 
 struct ContentView: View {
+    @Environment(\\.scenePhase) private var scenePhase
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var image: UIImage?
     @State private var lines: [RecognizedLine] = []
@@ -108,7 +109,12 @@ struct ContentView: View {
             .padding()
             .navigationTitle("QuickTranslate")
             .onAppear {
-                loadLatestScreenshotFromLibrary()
+                processShortcutRequestIfNeeded()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    processShortcutRequestIfNeeded()
+                }
             }
             .onChange(of: selectedPhoto) { _, item in
                 Task { await loadPhoto(item) }
@@ -134,6 +140,12 @@ struct ContentView: View {
     private func fittedSize(_ imageSize: CGSize, in bounds: CGSize) -> CGSize {
         let scale = min(bounds.width / imageSize.width, bounds.height / imageSize.height)
         return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+    }
+
+    private func processShortcutRequestIfNeeded() {
+        guard UserDefaults.standard.bool(forKey: "QuickTranslateShouldLoadLatestScreenshot") else { return }
+        UserDefaults.standard.set(false, forKey: "QuickTranslateShouldLoadLatestScreenshot")
+        loadLatestScreenshotFromLibrary()
     }
 
     private func loadLatestScreenshotFromLibrary() {
