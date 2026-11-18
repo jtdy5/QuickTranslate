@@ -5,7 +5,6 @@ import Vision
 import Translation
 import ImageIO
 import NaturalLanguage
-import Photos
 import QuickLook
 
 struct RecognizedLine: Identifiable {
@@ -22,7 +21,7 @@ struct ContentView: View {
     @State private var translations: [UUID: String] = [:]
     @State private var targetLanguage = "en"
     @State private var configuration: TranslationSession.Configuration?
-    @State private var status = "Choose a screenshot or photo to begin."
+    @State private var status = "Take a screenshot and run the Translate Screenshot shortcut."
     @State private var autoTranslateAfterOCR = false
     @State private var translatedImage: UIImage?
     @State private var quickLookURL: URL?
@@ -91,8 +90,11 @@ struct ContentView: View {
                     }
                     .frame(maxHeight: .infinity)
                 } else {
-                    ContentUnavailableView("No image selected", systemImage: "text.viewfinder",
-                                           description: Text("Choose a screenshot or photo containing text."))
+                    ContentUnavailableView(
+                        "No image selected",
+                        systemImage: "text.viewfinder",
+                        description: Text("Run the Translate Screenshot shortcut or choose an image.")
+                    )
                     .frame(maxHeight: .infinity)
                 }
 
@@ -130,8 +132,6 @@ struct ContentView: View {
                             let result = try await session.translate(line.text)
                             translations[line.id] = result.targetText
                         } catch {
-                            // Keep the original OCR text in this box instead of aborting
-                            // the entire page because one short/noisy fragment failed.
                             translations[line.id] = line.text
                             failedLines += 1
                         }
@@ -161,95 +161,22 @@ struct ContentView: View {
     }
 
     private func processShortcutRequestIfNeeded() {
-        guard UserDefaults.standard.bool(forKey: "QuickTranslateShouldLoadLatestScreenshot") else { return }
-        UserDefaults.standard.set(false, forKey: "QuickTranslateShouldLoadLatestScreenshot")
-        loadLatestScreenshotFromLibrary()
-    }
+        guard UserDefaults.standard.bool(forKey: "QuickTranslateHasPendingScreenshot") else { return }
+        UserDefaults.standard.set(false, forKey: "QuickTranslateHasPendingScreenshot")
 
-    private func loadLatestScreenshotFromLibrary() {
-        status = "Finding your latest screenshot…"
-        Task {
-            let currentStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-            let access: PHAuthorizationStatus
-            if currentStatus == .notDetermined {
-                access = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-            } else {
-                access = currentStatus
-            }
-
-            guard access == .authorized || access == .limited else {
-                await MainActor.run {
-                    status = "Allow QuickTranslate access to Photos so it can find your latest screenshot."
-                }
-                return
-            }
-
-            let options = PHFetchOptions()
-            options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-            options.predicate = NSPredicate(
-                format: "(mediaSubtype & %d) != 0",
-                PHAssetMediaSubtype.photoScreenshot.rawValue
-            )
-            options.fetchLimit = 1
-            let results = PHAsset.fetchAssets(with: .image, options: options)
-            guard let asset = results.firstObject else {
-                await MainActor.run {
-                    status = "No screenshots found in Photos. Take a screenshot and try again."
-                }
-                return
-            }
-
-            let requestOptions = PHImageRequestOptions()
-            requestOptions.isSynchronous = false
-            requestOptions.deliveryMode = .highQualityFormat
-            requestOptions.version = .current
-            requestOptions.isNetworkAccessAllowed = true
-
-            do {
-                let data = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-                    PHImageManager.default().requestImageDataAndOrientation(
-                        for: asset,
-                        options: requestOptions
-                    ) { data, _, _, info in
-                        if let error = info?[PHImageErrorKey] as? Error {
-                            continuation.resume(throwing: error)
-                        } else if (info?[PHImageCancelledKey] as? Bool) == true {
-                            continuation.resume(throwing: NSError(
-                                domain: "QuickTranslate", code: 11,
-                                userInfo: [NSLocalizedDescriptionKey: "Screenshot loading was cancelled."]
-                            ))
-                        } else if let data {
-                            continuation.resume(returning: data)
-                        } else {
-                            continuation.resume(throwing: NSError(
-                                domain: "QuickTranslate", code: 12,
-                                userInfo: [NSLocalizedDescriptionKey: "Could not load the latest screenshot."]
-                            ))
-                        }
-                    }
-                }
-
-                guard let uiImage = UIImage(data: data) else {
-                    throw NSError(domain: "QuickTranslate", code: 13,
-                                  userInfo: [NSLocalizedDescriptionKey: "The latest screenshot is not a supported image."])
-                }
-
-                await MainActor.run {
-                    selectedPhoto = nil
-                    image = uiImage
-                    lines = []
-                    translations = [:]
-                    translatedImage = nil
-                    autoTranslateAfterOCR = true
-                    status = "Reading screenshot and detecting language…"
-                    recognizeText(in: uiImage)
-                }
-            } catch {
-                await MainActor.run {
-                    status = "Could not load the latest screenshot: \(error.localizedDescription)"
-                }
-            }
+        guard let data = PendingScreenshotStore.take(),
+              let screenshot = UIImage(data: data) else {
+            status = "The screenshot could not be received from Shortcuts. Run Take Screenshot immediately before Translate Screenshot."
+            return
         }
+
+        image = screenshot
+        lines = []
+        translations = [:]
+        translatedImage = nil
+        autoTranslateAfterOCR = true
+        status = "Reading screenshot and detecting language…"
+        recognizeText(in: screenshot)
     }
 
     @MainActor
@@ -319,8 +246,9 @@ struct ContentView: View {
         request.usesLanguageCorrection = true
         request.automaticallyDetectsLanguage = true
         request.minimumTextHeight = 0.007
+        let orientation = cgImageOrientation(for: image.imageOrientation)
         DispatchQueue.global(qos: .userInitiated).async {
-            let handler = VNImageRequestHandler(cgImage: cgImage, orientation: cgImageOrientation(for: image.imageOrientation))
+            let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
             do {
                 try handler.perform([request])
             } catch {
@@ -332,12 +260,10 @@ struct ContentView: View {
         }
     }
 
-
     private func detectedTranslationConfiguration() -> TranslationSession.Configuration {
-        // Manga OCR often contains mixed scripts, sound effects and interface text.
-        // A guessed source language can make Translation reject the entire page.
-        // Let Apple's Translation framework detect the source for each fragment.
-        return TranslationSession.Configuration(
+        // Let Apple Translation detect the source for each OCR fragment. A
+        // single guessed language is unreliable on mixed-language manga pages.
+        TranslationSession.Configuration(
             source: nil,
             target: Locale.Language(identifier: targetLanguage)
         )
