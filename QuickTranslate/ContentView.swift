@@ -124,14 +124,24 @@ struct ContentView: View {
             .translationTask(configuration) { session in
                 do {
                     translations.removeAll()
+                    var failedLines = 0
                     for line in lines {
-                        let result = try await session.translate(line.text)
-                        translations[line.id] = result.targetText
+                        do {
+                            let result = try await session.translate(line.text)
+                            translations[line.id] = result.targetText
+                        } catch {
+                            // Keep the original OCR text in this box instead of aborting
+                            // the entire page because one short/noisy fragment failed.
+                            translations[line.id] = line.text
+                            failedLines += 1
+                        }
                     }
                     if let output = renderTranslatedImage() {
                         translatedImage = output
                         presentQuickLook(for: output)
-                        status = "Translation complete."
+                        status = failedLines == 0
+                            ? "Translation complete."
+                            : "Preview ready. \(failedLines) of \(lines.count) text lines could not be translated."
                     } else {
                         status = "Could not create the translated image."
                     }
@@ -324,13 +334,11 @@ struct ContentView: View {
 
 
     private func detectedTranslationConfiguration() -> TranslationSession.Configuration {
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(lines.map(\.text).joined(separator: " "))
-        let source = recognizer.dominantLanguage.map {
-            Locale.Language(identifier: $0.rawValue)
-        }
+        // Manga OCR often contains mixed scripts, sound effects and interface text.
+        // A guessed source language can make Translation reject the entire page.
+        // Let Apple's Translation framework detect the source for each fragment.
         return TranslationSession.Configuration(
-            source: source,
+            source: nil,
             target: Locale.Language(identifier: targetLanguage)
         )
     }
