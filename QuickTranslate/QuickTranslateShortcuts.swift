@@ -20,12 +20,26 @@ private func recognizedObservations(in data: Data) throws -> [VNRecognizedTextOb
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.usesLanguageCorrection = true
-    request.minimumTextHeight = 0.004
+    request.automaticallyDetectsLanguage = true
+    request.minimumTextHeight = 0.007
 
     let handler = VNImageRequestHandler(data: data)
     try handler.perform([request])
 
-    return (request.results ?? []).sorted {
+    // Ignore low-confidence noise, tiny interface labels, status-bar text,
+    // and OCR fragments that contain no meaningful letters.
+    let filtered = (request.results ?? []).filter { observation in
+        guard observation.confidence >= 0.35 else { return false }
+        let box = observation.boundingBox
+        guard box.height >= 0.007, box.midY > 0.055, box.midY < 0.96 else { return false }
+        guard let candidate = observation.topCandidates(1).first else { return false }
+        let letterCount = candidate.string.unicodeScalars.filter {
+            CharacterSet.letters.contains($0)
+        }.count
+        return letterCount >= 2
+    }
+
+    return filtered.sorted {
         if abs($0.boundingBox.midY - $1.boundingBox.midY) > 0.012 {
             return $0.boundingBox.midY > $1.boundingBox.midY
         }
