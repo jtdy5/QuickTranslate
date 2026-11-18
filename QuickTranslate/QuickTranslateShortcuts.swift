@@ -62,11 +62,16 @@ struct RenderTranslatedScreenshotIntent: AppIntent {
 
     @Parameter(
         title: "Original Screenshot",
+        description: "Connect the screenshot from Find Photos using the Shortcut variable picker; do not choose a file when running.",
         supportedContentTypes: [.image]
     )
     var screenshot: IntentFile
 
-    @Parameter(title: "Translated Text")
+    @Parameter(
+        title: "Translated Text",
+        description: "Connect this to the output of the Translate Text action.",
+        inputConnectionBehavior: .connectToPreviousIntentResult
+    )
     var translatedText: String
 
     func perform() async throws -> some ReturnsValue<IntentFile> {
