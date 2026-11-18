@@ -10,7 +10,7 @@ struct TranslateLatestScreenshotIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         UserDefaults.standard.set(true, forKey: "QuickTranslateShouldLoadLatestScreenshot")
-        .result()
+        return .result()
     }
 }
 
