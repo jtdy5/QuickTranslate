@@ -162,13 +162,13 @@ struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: ExtractTextFromScreenshotIntent(),
-            phrases: ["Translate my latest screenshot with \\(.applicationName)"],
+            phrases: ["Translate my latest screenshot with \(.applicationName)"],
             shortTitle: "Translate Screenshot",
             systemImageName: "text.viewfinder"
         )
         AppShortcut(
             intent: OpenQuickTranslateIntent(),
-            phrases: ["Open \\(.applicationName)"],
+            phrases: ["Open \(.applicationName)"],
             shortTitle: "Open QuickTranslate",
             systemImageName: "translate"
         )
