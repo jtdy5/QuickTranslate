@@ -1,16 +1,14 @@
 import AppIntents
 import Foundation
-import UIKit
 import UniformTypeIdentifiers
 
-/// Translates the screenshot directly inside Shortcuts and returns the finished
-/// PNG as a file result for Quick Look or any following shortcut action.
+/// Hands the screenshot to the app's TranslationSession-backed workflow.
+/// TranslationSession is provided by SwiftUI's translationTask and cannot be
+/// initialized directly from an AppIntent.
 struct TranslateLatestScreenshotIntent: AppIntent {
     static var title: LocalizedStringResource = "Translate Screenshot"
-    static var description = IntentDescription(
-        "Translates the screenshot and returns the finished translated image."
-    )
-    static var openAppWhenRun: Bool = false
+    static var description = IntentDescription("Translates the screenshot and opens the finished image preview.")
+    static var openAppWhenRun = true
 
     @Parameter(
         title: "Screenshot",
@@ -21,15 +19,12 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Translate \\.$screenshot")
+        Summary("Translate \.$screenshot")
     }
 
-    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> & ProvidesDialog {
-        let translatedFile = try await QuickTranslateShortcutPipeline.translate(screenshot.data)
-        return .result(
-            value: translatedFile,
-            dialog: "Your translated screenshot is ready."
-        )
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        try PendingScreenshotStore.save(screenshot.data)
+        return .result(dialog: "Screenshot received. QuickTranslate is preparing the translated image preview.")
     }
 }
 
@@ -37,28 +32,16 @@ struct OpenQuickTranslateIntent: AppIntent {
     static var title: LocalizedStringResource = "Open QuickTranslate"
     static var description = IntentDescription("Opens QuickTranslate.")
     static var openAppWhenRun = true
-
-    func perform() async throws -> some IntentResult {
-        .result()
-    }
+    func perform() async throws -> some IntentResult { .result() }
 }
 
 struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: TranslateLatestScreenshotIntent(),
-            phrases: [
-                "Translate my screenshot with \\(.applicationName)",
-                "Translate screen with \\(.applicationName)"
-            ],
-            shortTitle: "Translate Screenshot",
-            systemImageName: "text.viewfinder"
-        )
-        AppShortcut(
-            intent: OpenQuickTranslateIntent(),
-            phrases: ["Open \\(.applicationName)"],
-            shortTitle: "Open QuickTranslate",
-            systemImageName: "translate"
-        )
+        AppShortcut(intent: TranslateLatestScreenshotIntent(),
+            phrases: ["Translate my screenshot with \(.applicationName)", "Translate screen with \(.applicationName)"],
+            shortTitle: "Translate Screenshot", systemImageName: "text.viewfinder")
+        AppShortcut(intent: OpenQuickTranslateIntent(),
+            phrases: ["Open \(.applicationName)"], shortTitle: "Open QuickTranslate",
+            systemImageName: "translate")
     }
 }
