@@ -43,6 +43,7 @@ struct TranslateScreenshotIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         try screenshot.data.write(to: pendingScreenshotURL(), options: .atomic)
         try targetLanguage.write(to: pendingTargetLanguageURL(), atomically: true, encoding: .utf8)
+        NotificationCenter.default.post(name: Notification.Name("QuickTranslateProcessPendingScreenshot"), object: nil)
         return .result()
     }
 }
