@@ -6,6 +6,7 @@ import Translation
 import ImageIO
 import NaturalLanguage
 import Photos
+import QuickLook
 
 struct RecognizedLine: Identifiable {
     let id = UUID()
@@ -24,6 +25,7 @@ struct ContentView: View {
     @State private var status = "Choose a screenshot or photo to begin."
     @State private var autoTranslateAfterOCR = false
     @State private var translatedImage: UIImage?
+    @State private var quickLookURL: URL?
 
     private let languages = [
         ("da", "Danish"), ("en", "English"), ("de", "German"),
@@ -126,8 +128,13 @@ struct ContentView: View {
                         let result = try await session.translate(line.text)
                         translations[line.id] = result.targetText
                     }
-                    translatedImage = renderTranslatedImage()
-                    status = "Translation complete."
+                    if let output = renderTranslatedImage() {
+                        translatedImage = output
+                        presentQuickLook(for: output)
+                        status = "Translation complete."
+                    } else {
+                        status = "Could not create the translated image."
+                    }
                     autoTranslateAfterOCR = false
                 } catch {
                     status = "Translation failed: \\(error.localizedDescription)"
@@ -135,6 +142,7 @@ struct ContentView: View {
                 }
             }
         }
+        .quickLookPreview($quickLookURL)
     }
 
     private func fittedSize(_ imageSize: CGSize, in bounds: CGSize) -> CGSize {
@@ -325,6 +333,21 @@ struct ContentView: View {
             source: source,
             target: Locale.Language(identifier: targetLanguage)
         )
+    }
+
+    private func presentQuickLook(for image: UIImage) {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("QuickTranslate-\\(UUID().uuidString).png")
+        guard let data = image.pngData() else {
+            status = "Could not prepare the Quick Look preview."
+            return
+        }
+        do {
+            try data.write(to: url, options: .atomic)
+            quickLookURL = url
+        } catch {
+            status = "Could not open the translated image preview: \\(error.localizedDescription)"
+        }
     }
 
     private func renderTranslatedImage() -> UIImage? {
