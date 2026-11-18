@@ -251,7 +251,7 @@ struct ContentView: View {
 
     private func detectedTranslationConfiguration() -> TranslationSession.Configuration {
         let recognizer = NLLanguageRecognizer()
-        recognizer.processString(lines.map(\\.text).joined(separator: " "))
+        recognizer.processString(lines.map(\.text).joined(separator: " "))
         let source = recognizer.dominantLanguage.map {
             Locale.Language(identifier: $0.rawValue)
         }
