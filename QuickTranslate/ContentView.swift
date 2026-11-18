@@ -14,7 +14,7 @@ struct RecognizedLine: Identifiable {
 }
 
 struct ContentView: View {
-    @Environment(\\.scenePhase) private var scenePhase
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var image: UIImage?
     @State private var lines: [RecognizedLine] = []
