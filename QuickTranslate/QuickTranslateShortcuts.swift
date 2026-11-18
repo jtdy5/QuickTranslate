@@ -4,6 +4,17 @@ import UIKit
 import UniformTypeIdentifiers
 
 private let quickTranslateSeparator = " ⟦QTSEG⟧ "
+private let quickTranslateScreenshotFilename = "QuickTranslate-original-screenshot"
+
+private func cachedScreenshotURL() throws -> URL {
+    let directory = try FileManager.default.url(
+        for: .cachesDirectory,
+        in: .userDomainMask,
+        appropriateFor: nil,
+        create: true
+    )
+    return directory.appendingPathComponent(quickTranslateScreenshotFilename)
+}
 
 private func recognizedObservations(in data: Data) throws -> [VNRecognizedTextObservation] {
     let request = VNRecognizeTextRequest()
@@ -39,6 +50,9 @@ struct ExtractTextFromScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     func perform() async throws -> some ReturnsValue<String> {
+        let screenshotURL = try cachedScreenshotURL()
+        try screenshot.data.write(to: screenshotURL, options: .atomic)
+
         let observations = try recognizedObservations(in: screenshot.data)
         let blocks = observations.compactMap { $0.topCandidates(1).first?.string }
             .map { $0.replacingOccurrences(of: "\n", with: " ") }
@@ -61,13 +75,6 @@ struct RenderTranslatedScreenshotIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     @Parameter(
-        title: "Original Screenshot",
-        description: "Connect the screenshot from Find Photos using the Shortcut variable picker; do not choose a file when running.",
-        supportedContentTypes: [.image]
-    )
-    var screenshot: IntentFile
-
-    @Parameter(
         title: "Translated Text",
         description: "Connect this to the output of the Translate Text action.",
         inputConnectionBehavior: .connectToPreviousIntentResult
@@ -75,7 +82,13 @@ struct RenderTranslatedScreenshotIntent: AppIntent {
     var translatedText: String
 
     func perform() async throws -> some ReturnsValue<IntentFile> {
-        let observations = try recognizedObservations(in: screenshot.data)
+        let screenshotURL = try cachedScreenshotURL()
+        guard FileManager.default.fileExists(atPath: screenshotURL.path) else {
+            throw NSError(domain: "QuickTranslate", code: 6,
+                          userInfo: [NSLocalizedDescriptionKey: "No original screenshot is cached. Run Translate Latest Screenshot first, using the screenshot you want to translate."])
+        }
+        let screenshotData = try Data(contentsOf: screenshotURL)
+        let observations = try recognizedObservations(in: screenshotData)
         let translatedBlocks = translatedText.components(separatedBy: quickTranslateSeparator)
 
         guard !observations.isEmpty else {
@@ -88,7 +101,7 @@ struct RenderTranslatedScreenshotIntent: AppIntent {
                           userInfo: [NSLocalizedDescriptionKey: "The translation changed the text separators. Try translating without changing the ⟦QTSEG⟧ markers."])
         }
 
-        guard let original = UIImage(data: screenshot.data) else {
+        guard let original = UIImage(data: screenshotData) else {
             throw NSError(domain: "QuickTranslate", code: 4,
                           userInfo: [NSLocalizedDescriptionKey: "The supplied screenshot could not be opened as an image."])
         }
