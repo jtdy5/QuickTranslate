@@ -147,7 +147,7 @@ struct ContentView: View {
                     }
                     autoTranslateAfterOCR = false
                 } catch {
-                    status = "Translation failed: \\(error.localizedDescription)"
+                    status = "Translation failed: \(error.localizedDescription)"
                     autoTranslateAfterOCR = false
                 }
             }
@@ -246,7 +246,7 @@ struct ContentView: View {
                 }
             } catch {
                 await MainActor.run {
-                    status = "Could not load the latest screenshot: \\(error.localizedDescription)"
+                    status = "Could not load the latest screenshot: \(error.localizedDescription)"
                 }
             }
         }
@@ -292,7 +292,7 @@ struct ContentView: View {
         let request = VNRecognizeTextRequest { request, error in
             DispatchQueue.main.async {
                 if let error {
-                    status = "Text recognition failed: \\(error.localizedDescription)"
+                    status = "Text recognition failed: \(error.localizedDescription)"
                     autoTranslateAfterOCR = false
                     return
                 }
@@ -306,7 +306,7 @@ struct ContentView: View {
                     else { return nil }
                     return RecognizedLine(text: text, box: observation.boundingBox)
                 }
-                status = "Found \\(lines.count) text lines."
+                status = "Found \(lines.count) text lines."
                 if lines.isEmpty {
                     autoTranslateAfterOCR = false
                     status = "No readable text was found. Try cropping away the app interface."
@@ -325,7 +325,7 @@ struct ContentView: View {
                 try handler.perform([request])
             } catch {
                 DispatchQueue.main.async {
-                    status = "Text recognition failed: \\(error.localizedDescription)"
+                    status = "Text recognition failed: \(error.localizedDescription)"
                     autoTranslateAfterOCR = false
                 }
             }
@@ -345,7 +345,7 @@ struct ContentView: View {
 
     private func presentQuickLook(for image: UIImage) {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("QuickTranslate-\\(UUID().uuidString).png")
+            .appendingPathComponent("QuickTranslate-\(UUID().uuidString).png")
         guard let data = image.pngData() else {
             status = "Could not prepare the Quick Look preview."
             return
@@ -354,7 +354,7 @@ struct ContentView: View {
             try data.write(to: url, options: .atomic)
             quickLookURL = url
         } catch {
-            status = "Could not open the translated image preview: \\(error.localizedDescription)"
+            status = "Could not open the translated image preview: \(error.localizedDescription)"
         }
     }
 
