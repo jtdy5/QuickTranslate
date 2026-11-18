@@ -3,30 +3,14 @@ import Foundation
 import UIKit
 import UniformTypeIdentifiers
 
-/// Transfers the screenshot from Shortcuts to the foreground app without
-/// asking the user to pick a file or searching the Photos library.
-enum PendingScreenshotStore {
-    private static var fileURL: URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("QuickTranslate-pending-screenshot")
-    }
-
-    static func save(_ data: Data) throws {
-        try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
-    }
-
-    static func take() -> Data? {
-        defer { try? FileManager.default.removeItem(at: fileURL) }
-        return try? Data(contentsOf: fileURL)
-    }
-}
-
+/// Translates the screenshot directly inside Shortcuts and returns the finished
+/// PNG as a file result for Quick Look or any following shortcut action.
 struct TranslateLatestScreenshotIntent: AppIntent {
     static var title: LocalizedStringResource = "Translate Screenshot"
     static var description = IntentDescription(
-        "Receives the screenshot from the action above, then opens QuickTranslate and displays the translated image."
+        "Translates the screenshot and returns the finished translated image."
     )
-    static var openAppWhenRun: Bool = true
+    static var openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Screenshot",
@@ -37,13 +21,15 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Translate \(\.$screenshot)")
+        Summary("Translate \\.$screenshot")
     }
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        try PendingScreenshotStore.save(screenshot.data)
-        UserDefaults.standard.set(true, forKey: "QuickTranslateHasPendingScreenshot")
-        return .result(dialog: "Opening QuickTranslate to translate your screenshot.")
+    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> & ProvidesDialog {
+        let translatedFile = try await QuickTranslateShortcutPipeline.translate(screenshot.data)
+        return .result(
+            value: translatedFile,
+            dialog: "Your translated screenshot is ready."
+        )
     }
 }
 
@@ -62,15 +48,15 @@ struct QuickTranslateShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: TranslateLatestScreenshotIntent(),
             phrases: [
-                "Translate my screenshot with \(.applicationName)",
-                "Translate screen with \(.applicationName)"
+                "Translate my screenshot with \\(.applicationName)",
+                "Translate screen with \\(.applicationName)"
             ],
             shortTitle: "Translate Screenshot",
             systemImageName: "text.viewfinder"
         )
         AppShortcut(
             intent: OpenQuickTranslateIntent(),
-            phrases: ["Open \(.applicationName)"],
+            phrases: ["Open \\(.applicationName)"],
             shortTitle: "Open QuickTranslate",
             systemImageName: "translate"
         )
