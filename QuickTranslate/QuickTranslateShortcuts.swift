@@ -52,7 +52,12 @@ struct TranslateLatestScreenshotIntent: AppIntent {
                 options: requestOptions
             ) { data, _, _, error in
                 if let error {
-                    continuation.resume(throwing: error)
+                    let photoError = NSError(
+                        domain: "QuickTranslate.PhotoRead",
+                        code: 1,
+                        userInfo: error
+                    )
+                    continuation.resume(throwing: photoError)
                 } else if let data {
                     continuation.resume(returning: data)
                 } else {
