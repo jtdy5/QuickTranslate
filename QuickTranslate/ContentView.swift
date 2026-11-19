@@ -169,7 +169,7 @@ struct ContentView: View {
                     do {
                         try await session.prepareTranslation()
                         await refreshLanguageAvailability()
-                        status = "Apple's offline language pack is downloaded and ready for this language pair."
+                        status = languagePackStatus
                     } catch {
                         status = "Could not prepare languages: \(error.localizedDescription)"
                     }
