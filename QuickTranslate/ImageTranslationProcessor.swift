@@ -18,7 +18,7 @@ enum ImageTranslationProcessor {
             case .noText: return "No readable text was found in the screenshot."
             case .noLanguage: return "The source language couldn't be identified."
             case .translationUnavailable(let language):
-                return "The on-device translation language for \(language) isn't installed. Download that language pair in Settings > Apps > Translate, then try again."
+                return "The offline translation pack for \(language) → English is not installed. Open QuickTranslate, select that source language, tap Download pack, then retry the shortcut."
             }
         }
     }
