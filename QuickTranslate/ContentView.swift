@@ -29,6 +29,7 @@ struct ContentView: View {
     @State private var quickLookURL: URL?
     @State private var prepareSourceLanguage = "zh-Hans"
     @State private var preparingLanguages = false
+    @State private var languagePackStatus = "Checking language pair…"
 
     private let languages = [
         ("da", "Danish"), ("en", "English"), ("de", "German"),
@@ -64,17 +65,24 @@ struct ContentView: View {
                         Text("Spanish").tag("es")
                     }
                     .pickerStyle(.menu)
-                    Button("Prepare offline") {
+                    Button {
                         preparingLanguages = true
                         status = "Preparing Apple translation languages…"
-                        configuration = TranslationSession.Configuration(
+                        let pair = TranslationSession.Configuration(
                             source: Locale.Language(identifier: prepareSourceLanguage),
                             target: Locale.Language(identifier: targetLanguage)
                         )
+                        configuration = pair
                         configuration?.invalidate()
+                    } label: {
+                        Label("Download pack", systemImage: "arrow.down.circle")
                     }
                     .buttonStyle(.bordered)
                 }
+                Text(languagePackStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let translatedImage {
                     Image(uiImage: translatedImage)
@@ -129,13 +137,26 @@ struct ContentView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                Button("Translate detected text") {
-                    translations.removeAll()
-                    translatedImage = nil
-                    configuration = detectedTranslationConfiguration()
+                Button {
+                    if lines.isEmpty {
+                        guard let image else { return }
+                        autoTranslateAfterOCR = true
+                        status = "Reading text and preparing translation…"
+                        recognizeText(in: image)
+                    } else {
+                        translations.removeAll()
+                        translatedImage = nil
+                        configuration = detectedTranslationConfiguration()
+                        configuration?.invalidate()
+                    }
+                } label: {
+                    Label(
+                        lines.isEmpty ? "Scan & Translate" : "Translate detected text",
+                        systemImage: "text.viewfinder"
+                    )
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(lines.isEmpty || autoTranslateAfterOCR)
+                .disabled(image == nil || autoTranslateAfterOCR)
             }
             .padding()
             .navigationTitle("QuickTranslate")
@@ -147,7 +168,8 @@ struct ContentView: View {
                 if preparingLanguages {
                     do {
                         try await session.prepareTranslation()
-                        status = "Offline translation language pair is ready."
+                        await refreshLanguageAvailability()
+                        status = "Apple's offline language pack is downloaded and ready for this language pair."
                     } catch {
                         status = "Could not prepare languages: \(error.localizedDescription)"
                     }
@@ -183,6 +205,9 @@ struct ContentView: View {
             }
         }
         .quickLookPreview($quickLookURL)
+        .task(id: "\(prepareSourceLanguage)-\(targetLanguage)") {
+            await refreshLanguageAvailability()
+        }
     }
 
     @MainActor
@@ -215,8 +240,8 @@ struct ContentView: View {
         lines = []
         translations = [:]
         translatedImage = nil
-        autoTranslateAfterOCR = false
-        status = "Reading text…"
+        autoTranslateAfterOCR = true
+        status = "Reading text and translating…"
         recognizeText(in: uiImage)
     }
 
@@ -341,6 +366,24 @@ struct ContentView: View {
                     autoTranslateAfterOCR = false
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func refreshLanguageAvailability() async {
+        let availability = LanguageAvailability()
+        let source = Locale.Language(identifier: prepareSourceLanguage)
+        let target = Locale.Language(identifier: targetLanguage)
+        let result = await availability.status(from: source, to: target)
+        switch result {
+        case .installed:
+            languagePackStatus = "Downloaded and ready: \(prepareSourceLanguage) → \(targetLanguage)"
+        case .supported:
+            languagePackStatus = "Available to download: \(prepareSourceLanguage) → \(targetLanguage)"
+        case .unsupported:
+            languagePackStatus = "Apple doesn't support this language pair."
+        @unknown default:
+            languagePackStatus = "Couldn't determine language-pack availability."
         }
     }
 
