@@ -21,13 +21,13 @@ struct TranslateLatestScreenshotIntent: AppIntent {
         Summary("Translate \(\.$screenshot)")
     }
 
-    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> & ProvidesDialog {
+    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
         let pngData = try await ImageTranslationProcessor.translate(
             screenshot.data,
             targetLanguage: "en"
         )
         let output = IntentFile(data: pngData, filename: "QuickTranslate-Translated.png", type: .png)
-        return .result(value: output, dialog: "Translation complete. The translated image is ready.")
+        return .result(value: output)
     }
 }
 
