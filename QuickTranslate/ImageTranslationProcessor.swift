@@ -127,6 +127,9 @@ enum ImageTranslationProcessor {
                     session = existing
                 } else {
                     do {
+                        guard #available(iOS 26.0, *) else {
+                            throw ProcessingError.translationUnavailable(sourceCode)
+                        }
                         session = try TranslationSession(
                             installedSource: Locale.Language(identifier: sourceCode),
                             target: Locale.Language(identifier: targetLanguage)
