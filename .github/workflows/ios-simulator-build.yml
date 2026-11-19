@@ -11,6 +11,13 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch OnscreenTranslator app icon
+        run: |
+          mkdir -p QuickTranslate/Assets.xcassets/AppIcon.appiconset
+          curl -fL --retry 3 \
+            "https://raw.githubusercontent.com/yeshengliu/OnscreenTranslator/4d54d1025b4ba05c7b91194468ff9c302dd813fb/OnscreenTranslator/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" \
+            -o QuickTranslate/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate Xcode project
