@@ -348,6 +348,7 @@ struct ContentView: View {
                     status = "No readable text was found. Try cropping away the app interface."
                 } else if autoTranslateAfterOCR {
                     configuration = detectedTranslationConfiguration()
+                    configuration?.invalidate()
                 }
             }
         }
