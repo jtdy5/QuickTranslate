@@ -2,13 +2,12 @@ import AppIntents
 import Foundation
 import UniformTypeIdentifiers
 
-/// Hands the screenshot to the app's TranslationSession-backed workflow.
-/// TranslationSession is provided by SwiftUI's translationTask and cannot be
-/// initialized directly from an AppIntent.
+/// Runs OCR and on-device translation in the Shortcut process, then returns
+/// the finished PNG directly to the next Shortcut action (for example Quick Look).
 struct TranslateLatestScreenshotIntent: AppIntent {
     static var title: LocalizedStringResource = "Translate Screenshot"
-    static var description = IntentDescription("Translates the screenshot and opens the finished image preview.")
-    static var openAppWhenRun = true
+    static var description = IntentDescription("Translates a screenshot and returns the finished image without opening QuickTranslate.")
+    static var openAppWhenRun = false
 
     @Parameter(
         title: "Screenshot",
@@ -19,12 +18,16 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Translate \(\.$screenshot)")
+        Summary("Translate \\.$screenshot")
     }
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        try PendingScreenshotStore.save(screenshot.data)
-        return .result(dialog: "Screenshot received. QuickTranslate is preparing the translated image preview.")
+    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> & ProvidesDialog {
+        let pngData = try await ImageTranslationProcessor.translate(
+            screenshot.data,
+            targetLanguage: "en"
+        )
+        let output = IntentFile(data: pngData, filename: "QuickTranslate-Translated.png", type: .png)
+        return .result(value: output, dialog: "Translation complete. The translated image is ready.")
     }
 }
 
@@ -37,11 +40,17 @@ struct OpenQuickTranslateIntent: AppIntent {
 
 struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
-        AppShortcut(intent: TranslateLatestScreenshotIntent(),
-            phrases: ["Translate my screenshot with \(.applicationName)", "Translate screen with \(.applicationName)"],
-            shortTitle: "Translate Screenshot", systemImageName: "text.viewfinder")
-        AppShortcut(intent: OpenQuickTranslateIntent(),
-            phrases: ["Open \(.applicationName)"], shortTitle: "Open QuickTranslate",
-            systemImageName: "translate")
+        AppShortcut(
+            intent: TranslateLatestScreenshotIntent(),
+            phrases: ["Translate my screenshot with \\(.applicationName)", "Translate screen with \\(.applicationName)"],
+            shortTitle: "Translate Screenshot",
+            systemImageName: "text.viewfinder"
+        )
+        AppShortcut(
+            intent: OpenQuickTranslateIntent(),
+            phrases: ["Open \\(.applicationName)"],
+            shortTitle: "Open QuickTranslate",
+            systemImageName: "translate"
+        )
     }
 }
