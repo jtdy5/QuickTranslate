@@ -2,6 +2,9 @@ name: iOS Unsigned IPA Build
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/ios-unsigned-ipa.yml"
 
 jobs:
   build:
