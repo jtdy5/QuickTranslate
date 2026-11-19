@@ -91,9 +91,9 @@ struct ScreenshotRenderer: Sendable {
             let topPad = min(7, topRoom / 2)
             let botPad = min(7, botRoom / 2)
             let base = CGRect(
-                x: box.rect.minX - 3,
+                x: box.rect.minX - 2,
                 y: box.rect.minY - topPad,
-                width: box.rect.width + 6,
+                width: box.rect.width + 4,
                 height: box.rect.height + topPad + botPad
             )
             // Match the source font size. Two independent estimates, take
@@ -114,9 +114,9 @@ struct ScreenshotRenderer: Sendable {
             // 50 pt soft cap is a final guard against extreme outliers.
             let sourceLineCount = max(1, box.text.split(separator: "\n", omittingEmptySubsequences: false).count)
             let perSourceLineHeight = box.rect.height / CGFloat(sourceLineCount)
-            let heightBasedFont = perSourceLineHeight * 0.65
+            let heightBasedFont = perSourceLineHeight * 0.84
             let charsPerLine = max(1, box.text.count / sourceLineCount)
-            let widthBasedFont = (box.rect.width / CGFloat(charsPerLine)) * 1.8
+            let widthBasedFont = (box.rect.width / CGFloat(charsPerLine)) * 2.1
             let targetFontSize = max(8, min(min(heightBasedFont, widthBasedFont), 50))
             let padded = hasTranslation
                 ? expandedRect(
@@ -132,8 +132,8 @@ struct ScreenshotRenderer: Sendable {
             let paddedFlipped = flipY(padded)
             let path = CGPath(
                 roundedRect: paddedFlipped,
-                cornerWidth: min(8, padded.height / 4),
-                cornerHeight: min(8, padded.height / 4),
+                cornerWidth: 2,
+                cornerHeight: 2,
                 transform: nil
             )
             // Always opaque: anything below 1.0 lets the original glyphs
@@ -189,7 +189,7 @@ struct ScreenshotRenderer: Sendable {
         // shrink the font instead — letting one translation expand 2-3 lines
         // tall reliably collides with neighbouring translations and produces
         // a confusing, misaligned overlay.
-        let maxHeight = min(base.height + downwardRoom + upwardRoom, base.height * 1.6)
+        let maxHeight = min(base.height + downwardRoom + upwardRoom, base.height * 2.0)
         let finalHeight = min(neededHeight, maxHeight)
         let extra = finalHeight - base.height
 
@@ -312,7 +312,7 @@ struct ScreenshotRenderer: Sendable {
         // Two shrink passes: comfortable lower bound 8pt, last-ditch 6pt
         // before truncation kicks in.
         let comfortFloor: CGFloat = 8
-        let lastDitchFloor: CGFloat = 6
+        let lastDitchFloor: CGFloat = 7
         var fontSize = max(comfortFloor, targetFontSize)
 
         func fits(_ size: CGFloat) -> Bool {
