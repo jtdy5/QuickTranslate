@@ -55,7 +55,7 @@ struct ContentView: View {
                 }
 
                 HStack {
-                    Picker("Offline source", selection: $prepareSourceLanguage) {
+                    Picker("Source language", selection: $prepareSourceLanguage) {
                         Text("Japanese").tag("ja")
                         Text("Chinese (Simplified)").tag("zh-Hans")
                         Text("Korean").tag("ko")
@@ -391,7 +391,7 @@ struct ContentView: View {
         // Let Apple Translation detect the source for each OCR fragment. A
         // single guessed language is unreliable on mixed-language manga pages.
         TranslationSession.Configuration(
-            source: nil,
+            source: Locale.Language(identifier: prepareSourceLanguage),
             target: Locale.Language(identifier: targetLanguage)
         )
     }
