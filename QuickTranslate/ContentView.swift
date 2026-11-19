@@ -151,8 +151,10 @@ struct ContentView: View {
                     }
                 } label: {
                     Label(
-                        lines.isEmpty ? "Scan & Translate" : "Translate detected text",
-                        systemImage: "text.viewfinder"
+                        autoTranslateAfterOCR
+                            ? "Processing…"
+                            : (lines.isEmpty ? "Scan & Translate" : "Translate detected text"),
+                        systemImage: autoTranslateAfterOCR ? "hourglass" : "text.viewfinder"
                     )
                 }
                 .buttonStyle(.borderedProminent)
