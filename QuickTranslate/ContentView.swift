@@ -139,22 +139,20 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
 
                 Button {
-                    if lines.isEmpty {
-                        guard let image else { return }
-                        autoTranslateAfterOCR = true
-                        status = "Reading text and preparing translation…"
-                        recognizeText(in: image)
-                    } else {
-                        translations.removeAll()
-                        translatedImage = nil
-                        configuration = detectedTranslationConfiguration()
-                        configuration?.invalidate()
-                    }
+                    guard let image else { return }
+                    // Always run the complete pipeline from one tap. Never stop
+                    // after OCR and ask the user to press a second Translate button.
+                    lines = []
+                    translations.removeAll()
+                    translatedImage = nil
+                    quickLookURL = nil
+                    configuration = nil
+                    autoTranslateAfterOCR = true
+                    status = "Reading text, then translating automatically…"
+                    recognizeText(in: image)
                 } label: {
                     Label(
-                        autoTranslateAfterOCR
-                            ? "Processing…"
-                            : (lines.isEmpty ? "Scan & Translate" : "Translate detected text"),
+                        autoTranslateAfterOCR ? "Processing…" : "Scan & Translate",
                         systemImage: autoTranslateAfterOCR ? "hourglass" : "text.viewfinder"
                     )
                 }
@@ -365,7 +363,11 @@ struct ContentView: View {
                     autoTranslateAfterOCR = false
                     status = "No readable text was found. Try cropping away the app interface."
                 } else if autoTranslateAfterOCR {
-                    configuration = detectedTranslationConfiguration()
+                    // Assign a fresh session configuration after OCR has populated
+                    // the recognized lines. The Translation task then translates
+                    // those lines and renders the preview without another tap.
+                    let nextConfiguration = detectedTranslationConfiguration()
+                    configuration = nextConfiguration
                     configuration?.invalidate()
                 }
             }
