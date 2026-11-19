@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var prepareSourceLanguage = "zh-Hans"
     @State private var preparingLanguages = false
     @State private var languagePackStatus = "Checking language pair…"
+    @State private var showingLanguagePacks = false
 
     private let languages = [
         ("da", "Danish"), ("en", "English"), ("de", "German"),
@@ -162,6 +163,21 @@ struct ContentView: View {
             }
             .padding()
             .navigationTitle("QuickTranslate")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingLanguagePacks = true
+                    } label: {
+                        Label("Language packs", systemImage: "globe")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingLanguagePacks) {
+                LanguagePackManagerView(
+                    selectedSourceLanguage: $prepareSourceLanguage,
+                    targetLanguage: targetLanguage
+                )
+            }
             .onAppear { processPendingScreenshot() }
             .onChange(of: selectedPhoto) { _, item in
                 Task { await loadPhoto(item) }
