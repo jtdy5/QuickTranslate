@@ -27,6 +27,8 @@ struct ContentView: View {
     @State private var autoTranslateAfterOCR = false
     @State private var translatedImage: UIImage?
     @State private var quickLookURL: URL?
+    @State private var prepareSourceLanguage = "zh-Hans"
+    @State private var preparingLanguages = false
 
     private let languages = [
         ("da", "Danish"), ("en", "English"), ("de", "German"),
@@ -49,6 +51,29 @@ struct ContentView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                }
+
+                HStack {
+                    Picker("Offline source", selection: $prepareSourceLanguage) {
+                        Text("Japanese").tag("ja")
+                        Text("Chinese (Simplified)").tag("zh-Hans")
+                        Text("Korean").tag("ko")
+                        Text("Danish").tag("da")
+                        Text("German").tag("de")
+                        Text("French").tag("fr")
+                        Text("Spanish").tag("es")
+                    }
+                    .pickerStyle(.menu)
+                    Button("Prepare offline") {
+                        preparingLanguages = true
+                        status = "Preparing Apple translation languages…"
+                        configuration = TranslationSession.Configuration(
+                            source: Locale.Language(identifier: prepareSourceLanguage),
+                            target: Locale.Language(identifier: targetLanguage)
+                        )
+                        configuration?.invalidate()
+                    }
+                    .buttonStyle(.bordered)
                 }
 
                 if let translatedImage {
@@ -119,6 +144,16 @@ struct ContentView: View {
                 Task { await loadPhoto(item) }
             }
             .translationTask(configuration) { session in
+                if preparingLanguages {
+                    do {
+                        try await session.prepareTranslation()
+                        status = "Offline translation language pair is ready."
+                    } catch {
+                        status = "Could not prepare languages: \(error.localizedDescription)"
+                    }
+                    preparingLanguages = false
+                    return
+                }
                 do {
                     translations.removeAll()
                     var failedLines = 0
