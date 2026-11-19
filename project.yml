@@ -10,6 +10,7 @@ settings:
     TARGETED_DEVICE_FAMILY: "1,2"
     GENERATE_INFOPLIST_FILE: YES
     INFOPLIST_KEY_CFBundleDisplayName: QuickTranslate
+    INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "QuickTranslate needs access to Photos to find and translate your latest screenshot."
     INFOPLIST_KEY_UILaunchScreen_Generation: YES
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
 targets:
