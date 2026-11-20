@@ -41,6 +41,22 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("One-tap screenshot shortcut", systemImage: "command")
+                        .font(.headline)
+                    Text("In Shortcuts, add QuickTranslate’s “Translate Screenshot” action between “Take Screenshot” and “Quick Look”. Connect the screenshot to the action’s Screenshot input, then use the action’s Translated Image output in Quick Look.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Link(destination: URL(string: "shortcuts://")!) {
+                        Label("Open Shortcuts to add it", systemImage: "arrow.up.forward.app")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+
                 HStack {
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         Label("Choose image", systemImage: "photo")
