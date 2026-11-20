@@ -16,7 +16,7 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Translate \(.\\$screenshot) to English")
+        Summary("Translate \(\.$screenshot) to English")
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
