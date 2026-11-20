@@ -197,6 +197,13 @@ struct ContentView: View {
                 Task { await loadPhoto(item) }
             }
             .translationTask(configuration) { session in
+                // Ignore configuration refreshes that happen before OCR has
+                // produced any text. The OCR callback will publish a fresh
+                // configuration once the recognized lines are ready.
+                if !preparingLanguages && lines.isEmpty {
+                    autoTranslateAfterOCR = false
+                    return
+                }
                 if preparingLanguages {
                     do {
                         try await session.prepareTranslation()
@@ -382,9 +389,10 @@ struct ContentView: View {
                     // Assign a fresh session configuration after OCR has populated
                     // the recognized lines. The Translation task then translates
                     // those lines and renders the preview without another tap.
-                    let nextConfiguration = detectedTranslationConfiguration()
-                    configuration = nextConfiguration
-                    configuration?.invalidate()
+                    // A fresh configuration change is enough to start
+                    // translationTask. Do not invalidate a brand-new session:
+                    // invalidate is only needed when reusing a configuration.
+                    configuration = detectedTranslationConfiguration()
                 }
             }
         }
