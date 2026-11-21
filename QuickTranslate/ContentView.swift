@@ -107,21 +107,10 @@ struct ContentView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxHeight: .infinity)
-                    HStack(spacing: 12) {
-                        Button {
-                            showingOriginalImage.toggle()
-                        } label: {
-                            Label(
-                                showingOriginalImage ? "Show translation" : "Show original",
-                                systemImage: showingOriginalImage ? "character.bubble" : "text.viewfinder"
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                        ShareLink(item: Image(uiImage: translatedImage), preview: SharePreview("QuickTranslate image")) {
-                            Label("Share translated image", systemImage: "square.and.arrow.up")
-                        }
-                        .buttonStyle(.borderedProminent)
+                    ShareLink(item: Image(uiImage: translatedImage), preview: SharePreview("QuickTranslate image")) {
+                        Label("Share translated image", systemImage: "square.and.arrow.up")
                     }
+                    .buttonStyle(.borderedProminent)
                 } else if let image {
                     GeometryReader { proxy in
                         let size = fittedSize(image.size, in: proxy.size)
@@ -167,12 +156,20 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
 
                 Button {
-                    guard let image else { return }
-                    beginProcessing(image, statusMessage: "Reading text, then translating automatically…")
+                    if translatedImage != nil {
+                        showingOriginalImage.toggle()
+                    } else {
+                        guard let image else { return }
+                        beginProcessing(image, statusMessage: "Reading text, then translating automatically…")
+                    }
                 } label: {
                     Label(
-                        autoTranslateAfterOCR ? "Processing…" : "Scan & Translate",
-                        systemImage: autoTranslateAfterOCR ? "hourglass" : "text.viewfinder"
+                        autoTranslateAfterOCR ? "Processing…" :
+                            (translatedImage == nil ? "Scan & Translate" :
+                                (showingOriginalImage ? "Show Translation" : "Show Original")),
+                        systemImage: autoTranslateAfterOCR ? "hourglass" :
+                            (translatedImage == nil ? "text.viewfinder" :
+                                (showingOriginalImage ? "character.bubble" : "text.viewfinder"))
                     )
                 }
                 .buttonStyle(.borderedProminent)
