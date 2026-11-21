@@ -185,11 +185,11 @@ struct ScreenshotRenderer: Sendable {
         let downwardRoom = max(0, absoluteCeiling - base.maxY)
         let upwardRoom = max(0, base.minY - absoluteFloor)
 
-        // Hard cap growth at 1.6× the original line height. Beyond that we
-        // shrink the font instead — letting one translation expand 2-3 lines
-        // tall reliably collides with neighbouring translations and produces
-        // a confusing, misaligned overlay.
-        let maxHeight = min(base.height + downwardRoom + upwardRoom, base.height * 2.0)
+        // Keep masks close to the original OCR line. Large expansion creates
+        // opaque white bands that can cover the next translated line. Prefer
+        // shrinking the translated text to fit rather than borrowing the
+        // neighbouring line's space.
+        let maxHeight = min(base.height + downwardRoom + upwardRoom, base.height * 1.20)
         let finalHeight = min(neededHeight, maxHeight)
         let extra = finalHeight - base.height
 
@@ -309,24 +309,19 @@ struct ScreenshotRenderer: Sendable {
         targetFontSize: CGFloat
     ) {
         // Start at the target font size (visually matching the source UI).
-        // Two shrink passes: comfortable lower bound 8pt, last-ditch 6pt
-        // before truncation kicks in.
-        let comfortFloor: CGFloat = 8
-        let lastDitchFloor: CGFloat = 7
-        var fontSize = max(comfortFloor, targetFontSize)
+        // Keep long translations inside their own OCR region. A smaller
+        // legible font is preferable to allowing CoreText to clip lines or
+        // painting over the following text region.
+        let minimumFontSize: CGFloat = 5
+        var fontSize = max(minimumFontSize, targetFontSize)
 
         func fits(_ size: CGFloat) -> Bool {
             let measured = measureText(text, font: makeFont(size: size), maxWidth: rect.width)
             return measured.height <= rect.height && measured.width <= rect.width
         }
 
-        while fontSize > comfortFloor, !fits(fontSize) {
-            fontSize -= 1
-        }
-        if !fits(fontSize), rect.height < 14, fontSize > lastDitchFloor {
-            while fontSize > lastDitchFloor, !fits(fontSize) {
-                fontSize -= 1
-            }
+        while fontSize > minimumFontSize, !fits(fontSize) {
+            fontSize = max(minimumFontSize, fontSize - 0.5)
         }
 
         let font = makeFont(size: fontSize)
