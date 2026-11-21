@@ -16,6 +16,7 @@ struct RecognizedLine: Identifiable {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var image: UIImage?
     @State private var lines: [RecognizedLine] = []
@@ -43,7 +44,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("One-tap screenshot shortcut", systemImage: "command")
                         .font(.headline)
-                    Text("In Shortcuts, add QuickTranslate’s “Translate Screenshot” action between “Take Screenshot” and “Quick Look”. Connect the screenshot to the action’s Screenshot input, then use the action’s Translated Image output in Quick Look.")
+                    Text("In Shortcuts, connect the screenshot from “Take Screenshot” to “Translate Screenshot”. The shortcut opens this interactive preview automatically; remove the old Quick Look action.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Link(destination: URL(string: "shortcuts://")!) {
@@ -201,6 +202,9 @@ struct ContentView: View {
                 )
             }
             .onAppear { processPendingScreenshot() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { processPendingScreenshot() }
+            }
             .onChange(of: selectedPhoto) { _, item in
                 Task { await loadPhoto(item) }
             }
