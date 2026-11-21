@@ -26,6 +26,7 @@ struct ContentView: View {
     @State private var status = "Take a screenshot and run the Translate Screenshot shortcut."
     @State private var autoTranslateAfterOCR = false
     @State private var translatedImage: UIImage?
+    @State private var showingOriginalImage = false
     @State private var quickLookURL: URL?
     @State private var prepareSourceLanguage = "zh-Hans"
     @State private var preparingLanguages = false
@@ -102,14 +103,25 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let translatedImage {
-                    Image(uiImage: translatedImage)
+                    Image(uiImage: showingOriginalImage ? (image ?? translatedImage) : translatedImage)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxHeight: .infinity)
-                    ShareLink(item: Image(uiImage: translatedImage), preview: SharePreview("QuickTranslate image")) {
-                        Label("Share translated image", systemImage: "square.and.arrow.up")
+                    HStack(spacing: 12) {
+                        Button {
+                            showingOriginalImage.toggle()
+                        } label: {
+                            Label(
+                                showingOriginalImage ? "Show translation" : "Show original",
+                                systemImage: showingOriginalImage ? "character.bubble" : "text.viewfinder"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        ShareLink(item: Image(uiImage: translatedImage), preview: SharePreview("QuickTranslate image")) {
+                            Label("Share translated image", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.borderedProminent)
                 } else if let image {
                     GeometryReader { proxy in
                         let size = fittedSize(image.size, in: proxy.size)
@@ -222,6 +234,7 @@ struct ContentView: View {
                     }
                     if let output = renderTranslatedImage() {
                         translatedImage = output
+                        showingOriginalImage = false
                         presentQuickLook(for: output)
                         status = failedLines == 0
                             ? "Translation complete."
@@ -255,6 +268,7 @@ struct ContentView: View {
         lines = []
         translations = [:]
         translatedImage = nil
+        showingOriginalImage = false
         quickLookURL = nil
         configuration = nil
         autoTranslateAfterOCR = true
