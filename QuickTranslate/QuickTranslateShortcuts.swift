@@ -2,30 +2,24 @@ import AppIntents
 import Foundation
 import UniformTypeIdentifiers
 
-/// Receives the image output from the preceding Take Screenshot action,
-/// translates it on-device, and returns the translated PNG for Quick Look.
+/// Hands the screenshot to the app so its interactive preview can be used.
+/// Quick Look is deliberately not returned: it is a static preview and cannot
+/// expose the Original / Translation controls.
 struct TranslateLatestScreenshotIntent: AppIntent {
     static var title: LocalizedStringResource = "Translate Screenshot"
-    static var description = IntentDescription("Translate the screenshot supplied by the previous Shortcut action to English offline and return the translated image.")
-    static var openAppWhenRun = false
+    static var description = IntentDescription("Send the screenshot to QuickTranslate for automatic OCR and translation in the interactive app preview.")
+    static var openAppWhenRun = true
 
-    // Keep this required and include it in parameterSummary. That makes the
-    // screenshot input visible in the Shortcuts editor so the Take Screenshot
-    // magic variable can be connected instead of silently running with nil.
     @Parameter(title: "Screenshot", description: "Select the Screenshot magic variable from the preceding Take Screenshot action.")
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Translate \(\.$screenshot) to English")
+        Summary("Open \(\.$screenshot) in QuickTranslate")
     }
 
-    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
-        let pngData = try await ImageTranslationProcessor.translate(
-            screenshot.data,
-            targetLanguage: "en"
-        )
-        let output = IntentFile(data: pngData, filename: "QuickTranslate-Translated.png", type: .png)
-        return .result(value: output)
+    func perform() async throws -> some IntentResult {
+        try PendingScreenshotStore.save(screenshot.data)
+        return .result()
     }
 }
 
