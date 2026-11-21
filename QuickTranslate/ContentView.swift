@@ -156,16 +156,7 @@ struct ContentView: View {
 
                 Button {
                     guard let image else { return }
-                    // Always run the complete pipeline from one tap. Never stop
-                    // after OCR and ask the user to press a second Translate button.
-                    lines = []
-                    translations.removeAll()
-                    translatedImage = nil
-                    quickLookURL = nil
-                    configuration = nil
-                    autoTranslateAfterOCR = true
-                    status = "Reading text, then translating automatically…"
-                    recognizeText(in: image)
+                    beginProcessing(image, statusMessage: "Reading text, then translating automatically…")
                 } label: {
                     Label(
                         autoTranslateAfterOCR ? "Processing…" : "Scan & Translate",
@@ -201,7 +192,9 @@ struct ContentView: View {
                 // produced any text. The OCR callback will publish a fresh
                 // configuration once the recognized lines are ready.
                 if !preparingLanguages && lines.isEmpty {
-                    autoTranslateAfterOCR = false
+                    // A session refresh can arrive while SwiftUI is still applying
+                    // the OCR state update. Keep the automatic request alive;
+                    // OCR publishes a fresh configuration once lines are ready.
                     return
                 }
                 if preparingLanguages {
@@ -254,12 +247,19 @@ struct ContentView: View {
         guard let data = PendingScreenshotStore.take(),
               let uiImage = UIImage(data: data) else { return }
         image = uiImage
+        beginProcessing(uiImage, statusMessage: "Reading screenshot and translating…")
+    }
+
+    @MainActor
+    private func beginProcessing(_ sourceImage: UIImage, statusMessage: String) {
         lines = []
         translations = [:]
         translatedImage = nil
+        quickLookURL = nil
+        configuration = nil
         autoTranslateAfterOCR = true
-        status = "Reading screenshot and translating…"
-        recognizeText(in: uiImage)
+        status = statusMessage
+        recognizeText(in: sourceImage)
     }
 
     private func fittedSize(_ imageSize: CGSize, in bounds: CGSize) -> CGSize {
@@ -276,12 +276,7 @@ struct ContentView: View {
             return
         }
         image = uiImage
-        lines = []
-        translations = [:]
-        translatedImage = nil
-        autoTranslateAfterOCR = true
-        status = "Reading text and translating…"
-        recognizeText(in: uiImage)
+        beginProcessing(uiImage, statusMessage: "Reading text and translating…")
     }
 
     private func cgImageOrientation(for orientation: UIImage.Orientation) -> CGImagePropertyOrientation {
@@ -433,10 +428,11 @@ struct ContentView: View {
     }
 
     private func detectedTranslationConfiguration() -> TranslationSession.Configuration {
-        // Let Apple Translation detect the source for each OCR fragment. A
-        // single guessed language is unreliable on mixed-language manga pages.
+        // Leave the source unset so Apple Translation detects the language in
+        // the OCR text. The source picker remains available for preparing a
+        // specific offline language pair in the language-pack manager.
         TranslationSession.Configuration(
-            source: Locale.Language(identifier: prepareSourceLanguage),
+            source: nil,
             target: Locale.Language(identifier: targetLanguage)
         )
     }
