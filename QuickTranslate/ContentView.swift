@@ -5,7 +5,6 @@ import Vision
 import Translation
 import ImageIO
 import NaturalLanguage
-import QuickLook
 
 struct RecognizedLine: Identifiable {
     let id = UUID()
@@ -27,7 +26,6 @@ struct ContentView: View {
     @State private var autoTranslateAfterOCR = false
     @State private var translatedImage: UIImage?
     @State private var showingOriginalImage = false
-    @State private var quickLookURL: URL?
     @State private var prepareSourceLanguage = "zh-Hans"
     @State private var preparingLanguages = false
     @State private var languagePackStatus = "Checking language pair…"
@@ -107,10 +105,20 @@ struct ContentView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxHeight: .infinity)
-                    ShareLink(item: Image(uiImage: translatedImage), preview: SharePreview("QuickTranslate image")) {
-                        Label("Share translated image", systemImage: "square.and.arrow.up")
+                    HStack(spacing: 10) {
+                        Button {
+                            showingOriginalImage.toggle()
+                        } label: {
+                            Label(showingOriginalImage ? "Show Translation" : "Show Original",
+                                  systemImage: showingOriginalImage ? "character.bubble" : "doc.text")
+                        }
+                        .buttonStyle(.bordered)
+
+                        ShareLink(item: Image(uiImage: translatedImage), preview: SharePreview("QuickTranslate image")) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.borderedProminent)
                 } else if let image {
                     GeometryReader { proxy in
                         let size = fittedSize(image.size, in: proxy.size)
@@ -232,7 +240,6 @@ struct ContentView: View {
                     if let output = renderTranslatedImage() {
                         translatedImage = output
                         showingOriginalImage = false
-                        presentQuickLook(for: output)
                         status = failedLines == 0
                             ? "Translation complete."
                             : "Preview ready. \(failedLines) of \(lines.count) text lines could not be translated."
@@ -246,7 +253,6 @@ struct ContentView: View {
                 }
             }
         }
-        .quickLookPreview($quickLookURL)
         .task(id: "\(prepareSourceLanguage)-\(targetLanguage)") {
             await refreshLanguageAvailability()
         }
@@ -266,7 +272,6 @@ struct ContentView: View {
         translations = [:]
         translatedImage = nil
         showingOriginalImage = false
-        quickLookURL = nil
         configuration = nil
         autoTranslateAfterOCR = true
         status = statusMessage
@@ -446,21 +451,6 @@ struct ContentView: View {
             source: nil,
             target: Locale.Language(identifier: targetLanguage)
         )
-    }
-
-    private func presentQuickLook(for image: UIImage) {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("QuickTranslate-\(UUID().uuidString).png")
-        guard let data = image.pngData() else {
-            status = "Could not prepare the Quick Look preview."
-            return
-        }
-        do {
-            try data.write(to: url, options: .atomic)
-            quickLookURL = url
-        } catch {
-            status = "Could not open the translated image preview: \(error.localizedDescription)"
-        }
     }
 
     private func renderTranslatedImage() -> UIImage? {
