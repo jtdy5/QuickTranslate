@@ -2,49 +2,38 @@ import AppIntents
 import Foundation
 import UniformTypeIdentifiers
 
-/// Hands the screenshot to the app so its interactive preview can be used.
-/// Quick Look is deliberately not returned: it is a static preview and cannot
-/// expose the Original / Translation controls.
+/// Keeps the Shortcut's Screenshot input and translated-image output stable.
+/// The original image is also handed to the app for its interactive preview.
 struct TranslateLatestScreenshotIntent: AppIntent {
     static var title: LocalizedStringResource = "Translate Screenshot"
-    static var description = IntentDescription("Send the screenshot to QuickTranslate for automatic OCR and translation in the interactive app preview.")
+    static var description = IntentDescription("Translate the supplied screenshot and open QuickTranslate's interactive preview.")
     static var openAppWhenRun = true
 
-    @Parameter(title: "Screenshot", description: "Select the Screenshot magic variable from the preceding Take Screenshot action.")
+    @Parameter(title: "Screenshot", description: "Screenshot from the preceding Take Screenshot action.")
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Translate \(\.$screenshot) to English")
+        Summary("Translate \\(\.$screenshot) to English")
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
         try PendingScreenshotStore.save(screenshot.data)
-        // Keep the same output type as the previous Shortcut action so its
-        // downstream magic-variable connection remains available.
-        return .result(value: screenshot)
+        let translatedData = try await ImageTranslationProcessor.translate(
+            screenshot.data,
+            targetLanguage: "en"
+        )
+        let output = IntentFile(data: translatedData, filename: "QuickTranslate-Translated.png", type: .png)
+        return .result(value: output)
     }
-}
-
-struct OpenQuickTranslateIntent: AppIntent {
-    static var title: LocalizedStringResource = "Open QuickTranslate"
-    static var description = IntentDescription("Opens QuickTranslate.")
-    static var openAppWhenRun = true
-    func perform() async throws -> some IntentResult { .result() }
 }
 
 struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: TranslateLatestScreenshotIntent(),
-            phrases: ["Translate my screenshot with \(.applicationName)", "Translate screen with \(.applicationName)"],
+            phrases: ["Translate my screenshot with \\(.applicationName)", "Translate screen with \\(.applicationName)"],
             shortTitle: "Translate Screenshot",
             systemImageName: "text.viewfinder"
-        )
-        AppShortcut(
-            intent: OpenQuickTranslateIntent(),
-            phrases: ["Open \(.applicationName)"],
-            shortTitle: "Open QuickTranslate",
-            systemImageName: "translate"
         )
     }
 }
