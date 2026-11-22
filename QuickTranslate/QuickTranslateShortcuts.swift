@@ -52,15 +52,15 @@ struct TranslateLatestScreenshotIntent: AppIntent {
           <style>
             * { box-sizing: border-box; }
             html, body { margin: 0; padding: 0; background: #111; color: #fff; font-family: -apple-system, sans-serif; }
-            .toolbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center; gap: 8px; padding: 12px; background: rgba(25,25,25,.96); }
+            .toolbar { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 2; display: flex; justify-content: center; gap: 5px; padding: 5px; border-radius: 20px; background: rgba(25,25,25,.82); }
             input { position: absolute; opacity: 0; pointer-events: none; }
-            label { padding: 9px 18px; border: 1px solid #777; border-radius: 18px; color: #eee; cursor: pointer; font-size: 15px; }
+            label { padding: 6px 11px; border: 1px solid #777; border-radius: 15px; color: #eee; cursor: pointer; font-size: 12px; line-height: 1.2; }
             #translated:checked ~ .toolbar label[for="translated"],
             #original:checked ~ .toolbar label[for="original"] { background: #fff; color: #111; border-color: #fff; }
             .image { display: none; width: 100%; height: auto; }
             #original:checked ~ .images .original,
             #translated:checked ~ .images .translated { display: block; }
-            .images { padding: 0; text-align: center; }
+            .images { padding: 0 0 58px; text-align: center; }
           </style>
         </head>
         <body>
