@@ -2,7 +2,8 @@ import AppIntents
 import Foundation
 import UniformTypeIdentifiers
 
-/// Receives the image produced by Take Screenshot and returns the translated image to Quick Look.
+/// Receives a screenshot, translates it with Apple's on-device frameworks,
+/// and returns a self-contained HTML document with an in-preview image toggle.
 struct TranslateLatestScreenshotIntent: AppIntent {
     static var title: LocalizedStringResource = "Translate Screenshot"
     static var description = IntentDescription("Translate the screenshot supplied by the preceding Shortcut action.")
@@ -21,12 +22,61 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
+        let originalData = screenshot.data
         let translatedData = try await ImageTranslationProcessor.translate(
-            screenshot.data,
+            originalData,
             targetLanguage: "en"
         )
-        let output = IntentFile(data: translatedData, filename: "QuickTranslate-Translated.png", type: .png)
+        let html = Self.makeTogglePreview(
+            original: originalData,
+            translated: translatedData
+        )
+        let output = IntentFile(
+            data: Data(html.utf8),
+            filename: "QuickTranslate-Preview.html",
+            type: .html
+        )
         return .result(value: output)
+    }
+
+    private static func makeTogglePreview(original: Data, translated: Data) -> String {
+        let originalImage = original.base64EncodedString()
+        let translatedImage = translated.base64EncodedString()
+        return """
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+          <meta charset="utf-8">
+          <title>QuickTranslate</title>
+          <style>
+            * { box-sizing: border-box; }
+            html, body { margin: 0; padding: 0; background: #111; color: #fff; font-family: -apple-system, sans-serif; }
+            .toolbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center; gap: 8px; padding: 12px; background: rgba(25,25,25,.96); }
+            input { position: absolute; opacity: 0; pointer-events: none; }
+            label { padding: 9px 18px; border: 1px solid #777; border-radius: 18px; color: #eee; cursor: pointer; font-size: 15px; }
+            #translated:checked ~ .toolbar label[for="translated"],
+            #original:checked ~ .toolbar label[for="original"] { background: #fff; color: #111; border-color: #fff; }
+            .image { display: none; width: 100%; height: auto; }
+            #original:checked ~ .images .original,
+            #translated:checked ~ .images .translated { display: block; }
+            .images { padding: 0; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <input type="radio" name="view" id="original">
+          <input type="radio" name="view" id="translated" checked>
+          <div class="toolbar">
+            <label for="original">Original</label>
+            <label for="translated">Translation</label>
+          </div>
+          <main class="images">
+            <img class="image original" alt="Original screenshot" src="data:image/png;base64,\(originalImage)">
+            <img class="image translated" alt="Translated screenshot" src="data:image/png;base64,\(translatedImage)">
+          </main>
+        </body>
+        </html>
+        """
     }
 }
 
