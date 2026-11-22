@@ -14,12 +14,14 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Open \(\.$screenshot) in QuickTranslate")
+        Summary("Translate \(\.$screenshot) to English")
     }
 
-    func perform() async throws -> some IntentResult {
+    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
         try PendingScreenshotStore.save(screenshot.data)
-        return .result()
+        // Keep the same output type as the previous Shortcut action so its
+        // downstream magic-variable connection remains available.
+        return .result(value: screenshot)
     }
 }
 
