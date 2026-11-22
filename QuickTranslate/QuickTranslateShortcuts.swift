@@ -13,7 +13,7 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Translate \\(\.$screenshot) to English")
+        Summary("Translate \(\.$screenshot) to English")
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
@@ -31,7 +31,7 @@ struct QuickTranslateShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: TranslateLatestScreenshotIntent(),
-            phrases: ["Translate my screenshot with \\(.applicationName)", "Translate screen with \\(.applicationName)"],
+            phrases: ["Translate my screenshot with \(.applicationName)", "Translate screen with \(.applicationName)"],
             shortTitle: "Translate Screenshot",
             systemImageName: "text.viewfinder"
         )
