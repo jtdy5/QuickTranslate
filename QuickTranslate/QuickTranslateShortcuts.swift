@@ -8,7 +8,12 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     static var description = IntentDescription("Translate the screenshot supplied by the preceding Shortcut action.")
     static var openAppWhenRun = false
 
-    @Parameter(title: "Screenshot", description: "Screenshot from the preceding Take Screenshot action.")
+    @Parameter(
+        title: "Screenshot",
+        description: "Image produced by the preceding Take Screenshot action.",
+        supportedContentTypes: [.image],
+        inputConnectionBehavior: .connectToPreviousIntentResult
+    )
     var screenshot: IntentFile
 
     static var parameterSummary: some ParameterSummary {
