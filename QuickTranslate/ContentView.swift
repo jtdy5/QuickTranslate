@@ -27,10 +27,6 @@ struct ContentView: View {
     @State private var autoTranslateAfterOCR = false
     @State private var translatedImage: UIImage?
     @State private var showingOriginalImage = false
-    @State private var prepareSourceLanguage = "zh-Hans"
-    @State private var preparingLanguages = false
-    @State private var languagePackStatus = "Checking language pair…"
-    @State private var showingLanguagePacks = false
 
     private let languages = [
         ("da", "Danish"), ("en", "English"), ("de", "German"),
@@ -40,195 +36,79 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("One-tap screenshot shortcut", systemImage: "command")
-                        .font(.headline)
-                    Text("In Shortcuts, connect the screenshot from “Take Screenshot” to “Translate Screenshot”. The shortcut opens this interactive preview automatically; remove the old Quick Look action.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Link(destination: URL(string: "shortcuts://")!) {
-                        Label("Open Shortcuts to add it", systemImage: "arrow.up.forward.app")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
-
-                HStack {
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                        Label("Choose image", systemImage: "photo")
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Picker("Translate to", selection: $targetLanguage) {
-                        ForEach(languages, id: \.0) { code, name in
-                            Text(name).tag(code)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-
-                HStack {
-                    Picker("Source language", selection: $prepareSourceLanguage) {
-                        Text("Japanese").tag("ja")
-                        Text("Chinese (Simplified)").tag("zh-Hans")
-                        Text("Korean").tag("ko")
-                        Text("Danish").tag("da")
-                        Text("German").tag("de")
-                        Text("French").tag("fr")
-                        Text("Spanish").tag("es")
-                    }
-                    .pickerStyle(.menu)
-                    Button {
-                        preparingLanguages = true
-                        status = "Preparing Apple translation languages…"
-                        let pair = TranslationSession.Configuration(
-                            source: Locale.Language(identifier: prepareSourceLanguage),
-                            target: Locale.Language(identifier: targetLanguage)
-                        )
-                        configuration = pair
-                        configuration?.invalidate()
-                    } label: {
-                        Label("Download pack", systemImage: "arrow.down.circle")
+                        Label("Photo", systemImage: "photo")
                     }
                     .buttonStyle(.bordered)
+                    Picker("Translate to", selection: $targetLanguage) {
+                        ForEach(languages, id: \.0) { code, name in Text(name).tag(code) }
+                    }
+                    .pickerStyle(.menu)
+                    Spacer(minLength: 0)
                 }
-                Text(languagePackStatus)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let translatedImage {
                     Image(uiImage: showingOriginalImage ? (image ?? translatedImage) : translatedImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: .infinity)
-                    HStack(spacing: 10) {
-                        Button {
-                            showingOriginalImage.toggle()
-                        } label: {
-                            Label(showingOriginalImage ? "Show Translation" : "Show Original",
+                        .resizable().aspectRatio(contentMode: .fit).frame(maxHeight: .infinity)
+                    HStack {
+                        Button { showingOriginalImage.toggle() } label: {
+                            Label(showingOriginalImage ? "Translation" : "Original",
                                   systemImage: showingOriginalImage ? "character.bubble" : "doc.text")
-                        }
-                        .buttonStyle(.bordered)
-
+                        }.buttonStyle(.bordered)
                         ShareLink(item: Image(uiImage: translatedImage), preview: SharePreview("QuickTranslate image")) {
                             Label("Share", systemImage: "square.and.arrow.up")
-                        }
-                        .buttonStyle(.borderedProminent)
+                        }.buttonStyle(.bordered)
                     }
                 } else if let image {
                     GeometryReader { proxy in
                         let size = fittedSize(image.size, in: proxy.size)
                         ZStack(alignment: .topLeading) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
+                            Image(uiImage: image).resizable().aspectRatio(contentMode: .fit)
                                 .frame(width: proxy.size.width, height: proxy.size.height)
-
                             ForEach(lines) { line in
                                 let rect = CGRect(
                                     x: line.box.minX * size.width + (proxy.size.width - size.width) / 2,
                                     y: (1 - line.box.maxY) * size.height + (proxy.size.height - size.height) / 2,
-                                    width: line.box.width * size.width,
-                                    height: line.box.height * size.height
+                                    width: line.box.width * size.width, height: line.box.height * size.height
                                 )
                                 Text(translations[line.id] ?? line.text)
                                     .font(.system(size: max(8, rect.height * 0.52), weight: .medium))
-                                    .lineLimit(3)
-                                    .minimumScaleFactor(0.35)
-                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(3).minimumScaleFactor(0.35).multilineTextAlignment(.leading)
                                     .padding(1)
                                     .frame(width: max(1, rect.width), height: max(1, rect.height), alignment: .leading)
-                                    .background(.white.opacity(0.96))
-                                    .foregroundStyle(.black)
-                                    .clipped()
+                                    .background(.white.opacity(0.96)).foregroundStyle(.black).clipped()
                                     .position(x: rect.midX, y: rect.midY)
                             }
                         }
-                    }
-                    .frame(maxHeight: .infinity)
+                    }.frame(maxHeight: .infinity)
                 } else {
-                    ContentUnavailableView(
-                        "No image selected",
-                        systemImage: "text.viewfinder",
-                        description: Text("Run the Translate Screenshot shortcut or choose an image.")
-                    )
-                    .frame(maxHeight: .infinity)
+                    ContentUnavailableView("Ready for screenshot", systemImage: "text.viewfinder",
+                        description: Text("Run the Translate Screenshot shortcut to process a screenshot."))
+                        .frame(maxHeight: .infinity)
                 }
 
-                Text(status)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
+                Text(status).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 Button {
-                    if translatedImage != nil {
-                        showingOriginalImage.toggle()
-                    } else {
-                        guard let image else { return }
-                        beginProcessing(image, statusMessage: "Reading text, then translating automatically…")
-                    }
+                    if translatedImage != nil { showingOriginalImage.toggle() }
+                    else if let image { beginProcessing(image, statusMessage: "Reading text and translating…") }
                 } label: {
-                    Label(
-                        autoTranslateAfterOCR ? "Processing…" :
-                            (translatedImage == nil ? "Scan & Translate" :
-                                (showingOriginalImage ? "Show Translation" : "Show Original")),
-                        systemImage: autoTranslateAfterOCR ? "hourglass" :
-                            (translatedImage == nil ? "text.viewfinder" :
-                                (showingOriginalImage ? "character.bubble" : "text.viewfinder"))
-                    )
+                    Label(autoTranslateAfterOCR ? "Processing…" :
+                        (translatedImage == nil ? "Translate" :
+                            (showingOriginalImage ? "Show Translation" : "Show Original")),
+                        systemImage: autoTranslateAfterOCR ? "hourglass" : "translate")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(image == nil || autoTranslateAfterOCR)
             }
-            .padding()
+            .padding(8)
             .navigationTitle("QuickTranslate")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingLanguagePacks = true
-                    } label: {
-                        Label("Language packs", systemImage: "globe")
-                    }
-                }
-            }
-            .sheet(isPresented: $showingLanguagePacks) {
-                LanguagePackManagerView(
-                    selectedSourceLanguage: $prepareSourceLanguage,
-                    targetLanguage: targetLanguage
-                )
-            }
             .onAppear { processPendingScreenshot() }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active { processPendingScreenshot() }
-            }
-            .onChange(of: selectedPhoto) { _, item in
-                Task { await loadPhoto(item) }
-            }
+            .onChange(of: scenePhase) { _, phase in if phase == .active { processPendingScreenshot() } }
+            .onChange(of: selectedPhoto) { _, item in Task { await loadPhoto(item) } }
             .translationTask(configuration) { session in
-                // Ignore configuration refreshes that happen before OCR has
-                // produced any text. The OCR callback will publish a fresh
-                // configuration once the recognized lines are ready.
-                if !preparingLanguages && lines.isEmpty {
-                    // A session refresh can arrive while SwiftUI is still applying
-                    // the OCR state update. Keep the automatic request alive;
-                    // OCR publishes a fresh configuration once lines are ready.
-                    return
-                }
-                if preparingLanguages {
-                    do {
-                        try await session.prepareTranslation()
-                        await refreshLanguageAvailability()
-                        status = languagePackStatus
-                    } catch {
-                        status = "Could not prepare languages: \(error.localizedDescription)"
-                    }
-                    preparingLanguages = false
-                    return
-                }
+                guard !lines.isEmpty else { return }
                 do {
                     translations.removeAll()
                     var failedLines = 0
@@ -244,21 +124,15 @@ struct ContentView: View {
                     if let output = renderTranslatedImage() {
                         translatedImage = output
                         showingOriginalImage = false
-                        status = failedLines == 0
-                            ? "Translation complete."
-                            : "Preview ready. \(failedLines) of \(lines.count) text lines could not be translated."
-                    } else {
-                        status = "Could not create the translated image."
-                    }
+                        status = failedLines == 0 ? "Translation complete." :
+                            "\(failedLines) of \(lines.count) lines could not be translated."
+                    } else { status = "Could not create translated image." }
                     autoTranslateAfterOCR = false
                 } catch {
                     status = "Translation failed: \(error.localizedDescription)"
                     autoTranslateAfterOCR = false
                 }
             }
-        }
-        .task(id: "\(prepareSourceLanguage)-\(targetLanguage)") {
-            await refreshLanguageAvailability()
         }
     }
 
@@ -426,24 +300,6 @@ struct ContentView: View {
                     autoTranslateAfterOCR = false
                 }
             }
-        }
-    }
-
-    @MainActor
-    private func refreshLanguageAvailability() async {
-        let availability = LanguageAvailability()
-        let source = Locale.Language(identifier: prepareSourceLanguage)
-        let target = Locale.Language(identifier: targetLanguage)
-        let result = await availability.status(from: source, to: target)
-        switch result {
-        case .installed:
-            languagePackStatus = "Downloaded and ready: \(prepareSourceLanguage) → \(targetLanguage)"
-        case .supported:
-            languagePackStatus = "Available to download: \(prepareSourceLanguage) → \(targetLanguage)"
-        case .unsupported:
-            languagePackStatus = "Apple doesn't support this language pair."
-        @unknown default:
-            languagePackStatus = "Couldn't determine language-pack availability."
         }
     }
 
