@@ -2,12 +2,11 @@ import AppIntents
 import Foundation
 import UniformTypeIdentifiers
 
-/// Keeps the Shortcut's Screenshot input and translated-image output stable.
-/// The original image is also handed to the app for its interactive preview.
+/// Receives the image produced by Take Screenshot and returns the translated image to Quick Look.
 struct TranslateLatestScreenshotIntent: AppIntent {
     static var title: LocalizedStringResource = "Translate Screenshot"
-    static var description = IntentDescription("Translate the supplied screenshot and open QuickTranslate's interactive preview.")
-    static var openAppWhenRun = true
+    static var description = IntentDescription("Translate the screenshot supplied by the preceding Shortcut action.")
+    static var openAppWhenRun = false
 
     @Parameter(title: "Screenshot", description: "Screenshot from the preceding Take Screenshot action.")
     var screenshot: IntentFile
@@ -17,7 +16,6 @@ struct TranslateLatestScreenshotIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
-        try PendingScreenshotStore.save(screenshot.data)
         let translatedData = try await ImageTranslationProcessor.translate(
             screenshot.data,
             targetLanguage: "en"
