@@ -118,16 +118,11 @@ struct ScreenshotRenderer: Sendable {
             let charsPerLine = max(1, box.text.count / sourceLineCount)
             let widthBasedFont = (box.rect.width / CGFloat(charsPerLine)) * 2.1
             let targetFontSize = max(8, min(min(heightBasedFont, widthBasedFont), 50))
-            let padded = hasTranslation
-                ? expandedRect(
-                    base: base,
-                    for: trimmed,
-                    targetFontSize: targetFontSize,
-                    canvas: canvas,
-                    downwardCeiling: downwardCeiling,
-                    upwardFloor: upwardFloor
-                )
-                : base.intersection(canvas)
+            // Keep each translation inside its own OCR box. Expanding a box
+            // to fit a longer English phrase can cover neighbouring text in
+            // dense shopping pages and manga panels. drawText scales and wraps
+            // the translation to fit this original region instead.
+            let padded = base.intersection(canvas)
             let palette = Self.ensureContrast(sampledPalette(from: image, box: box))
             let paddedFlipped = flipY(padded)
             let path = CGPath(
