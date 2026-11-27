@@ -52,7 +52,7 @@ struct TranslateLatestScreenshotIntent: AppIntent {
           <style>
             * { box-sizing: border-box; }
             html, body { margin: 0; padding: 0; background: #111; color: #fff; font-family: -apple-system, sans-serif; }
-            .toolbar { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 2; display: flex; justify-content: center; gap: 5px; padding: 5px; border-radius: 20px; background: rgba(25,25,25,.82); }
+            .toolbar { position: fixed; left: 50%; bottom: max(150px, calc(env(safe-area-inset-bottom) + 130px)); transform: translateX(-50%); z-index: 2; display: flex; justify-content: center; gap: 5px; padding: 5px; border-radius: 20px; background: rgba(25,25,25,.82); }
             input { position: absolute; opacity: 0; pointer-events: none; }
             label { padding: 6px 11px; border: 1px solid #777; border-radius: 15px; color: #eee; cursor: pointer; font-size: 12px; line-height: 1.2; }
             #translated:checked ~ .toolbar label[for="translated"],
